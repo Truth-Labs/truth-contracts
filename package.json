@@ -1,6 +1,16 @@
 {
-  "name": "war-contracts",
+  "name": "truth-contracts",
   "version": "1.0.0",
   "author": "Jack",
-  "license": "MIT"
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "compile": "forge build",
+    "prettier": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'"
+  },
+  "devDependencies": {},
+  "dependencies": {
+    "prettier": "^3.0.1",
+    "prettier-plugin-solidity": "^1.1.3"
+  }
 }
