@@ -81,6 +81,7 @@ contract OpinionMarket is IOpinionMarket {
     constructor(address _marketMaker, ISettings _initialSettings, string memory _actionId) {
         _settings = _initialSettings;
         marketMaker = _marketMaker;
+        startDate = block.timestamp;
 
         _worldId = IWorldID(_settings.worldId());
         _externalNullifier = abi

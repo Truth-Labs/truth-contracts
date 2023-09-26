@@ -6,10 +6,12 @@
   "type": "module",
   "scripts": {
     "compile": "forge build",
-    "prettier": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'"
+    "prettier": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
+    "deploy:OMD": "forge script script/OpinionMarketDeployer.s.sol:OMDScript --rpc-url $MUMBAI_RPC_URL --broadcast --verify -vvvv"
   },
   "devDependencies": {},
   "dependencies": {
+    "dotenv": "^16.3.1",
     "prettier": "^3.0.1",
     "prettier-plugin-solidity": "^1.1.3"
   }

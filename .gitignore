@@ -8,4 +8,6 @@ out/
 /broadcast/*/31337/
 
 /node_modules/
+node_modules/.yarn-integrity
+.env
 
