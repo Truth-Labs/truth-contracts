@@ -22,58 +22,60 @@ contract OpinionMarketTest is Test {
 
     function testDeploy() public {
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
 
         assertEq(IERC20(_token).balanceOf(address(market)), _deployer.settings().bounty());
     }
 
     function testFailDeployNotApproved() public {
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
 
         assertEq(IERC20(_token).balanceOf(address(market)), 0);
     }
 
-    function testCanCommitBet(uint256 _amount) public {
+    function testCanCommitBet(uint256 _amount, bytes32 _salt) public {
         vm.assume(_amount > 0);
         vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
 
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
 
         vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.Yes, _amount));
+        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount, _salt);
         OpinionMarket(market).commitBet(commitment);
         vm.stopPrank();
 
-        assertEq(OpinionMarket(market).commitments(_exampleAddress), commitment);
+        (,, bytes32 c) = OpinionMarket(market).bets(_exampleAddress);
+        assertEq(c, commitment);
     }
 
-    function testFailCommitBetTooLate(uint256 _amount) public {
+    function testFailCommitBetTooLate(uint256 _amount, bytes32 _salt) public {
                 vm.assume(_amount > 0);
         vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
 
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
         
         skip(2 days);
 
         vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.Yes, _amount));
+        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount, _salt);
         OpinionMarket(market).commitBet(commitment);
         vm.stopPrank();
 
-        assertEq(OpinionMarket(market).commitments(_exampleAddress), bytes32(0));
+        (,, bytes32 c) = OpinionMarket(market).bets(_exampleAddress);
+        assertEq(c, bytes32(0));
     }
 
-    function testOperatorCanRevealBet(uint256 _amount) public {
+    function testOperatorCanRevealBet(uint256 _amount, bytes32 _salt) public {
         vm.assume(_amount > 0);
         vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
 
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
         
         vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.Yes, _amount));
+        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount, _salt);
         OpinionMarket(market).commitBet(commitment);
         vm.stopPrank();
 
@@ -82,64 +84,39 @@ contract OpinionMarketTest is Test {
         _token.transfer(_exampleAddress, _amount);
         
         vm.startPrank(_exampleAddress);
-        _token.approve(market, _amount);
+        _token.approve(address(_deployer), _amount);
         vm.stopPrank();
         
-        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount);
+        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount, _salt);
 
         assertEq(OpinionMarket(market).yesVolume(), _amount);
     }
 
-    function testFailOperatorRevealBetEarly(IOpinionMarket.VoteChoice _choice, uint256 _amount) public {
+    function testFailOperatorRevealBetEarly(IOpinionMarket.VoteChoice _choice, uint256 _amount, bytes32 _salt) public {
         vm.assume(_amount > 0);
         vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
         vm.assume(_choice == IOpinionMarket.VoteChoice.Yes || _choice == IOpinionMarket.VoteChoice.No);
 
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
         
         vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.Yes, _amount));
+        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount, _salt);
         OpinionMarket(market).commitBet(commitment);
         vm.stopPrank();
 
         _token.transfer(_exampleAddress, _amount);
         
         vm.startPrank(_exampleAddress);
-        _token.approve(market, _amount);
+        _token.approve(address(_deployer), _amount);
         vm.stopPrank();
         
-        IOpinionMarket(market).revealBet(_exampleAddress, _choice, _amount);
-    }
-
-    function testFailOperatorRevealBetTwice(uint256 _amount) public {
-        vm.assume(_amount > 0);
-        vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
-
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
-        
-        vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.Yes, _amount));
-        OpinionMarket(market).commitBet(commitment);
-        vm.stopPrank();
-        
-        skip(2 days);
-        
-        _token.transfer(_exampleAddress, _amount);
-        
-        vm.startPrank(_exampleAddress);
-        _token.approve(market, _amount);
-        vm.stopPrank();
-        
-        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount);
-        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount);
-        assertEq(OpinionMarket(market).yesVolume(), _amount);
+        IOpinionMarket(market).revealBet(_exampleAddress, _choice, _amount, _salt);
     }
 
     function testCanCloseMarket() public {
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
         skip(2 days);
 
         assertEq(OpinionMarket(market).closed(), false);
@@ -149,7 +126,7 @@ contract OpinionMarketTest is Test {
 
     function testFailCloseNotOperator() public {
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
         skip(2 days);
 
         vm.prank(_exampleAddress);
@@ -158,19 +135,75 @@ contract OpinionMarketTest is Test {
 
     function testFailCloseTooEarly() public {
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
 
         IOpinionMarket(market).closeMarket();
     }
 
     function testMarketMaker() public {
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
 
-        assertEq(OpinionMarket(market).marketMaker(), address(this));
+        assertEq(OpinionMarket(market).marketMaker(), msg.sender);
     }
 
-    function testClaimFee(uint256 _amount1, uint256 _amount2) public {
+    function testCommitBet(address _bettor, bytes32 _commitment) public {
+        vm.assume(_bettor != address(0));
+        vm.assume(_commitment != bytes32(0));
+
+        _token.approve(address(_deployer), _deployer.settings().bounty());
+        address market = _deployer.deployMarket(msg.sender);
+
+        vm.startPrank(_bettor);
+        OpinionMarket(market).commitBet(_commitment);
+        vm.stopPrank();
+
+        (,, bytes32 c) = OpinionMarket(market).bets(_bettor);
+        assertEq(c, _commitment);
+    }
+
+    function testCommitVote(address _voter, bytes32 _commitment) public {
+        vm.assume(_voter != address(0));
+        vm.assume(_commitment != bytes32(0));
+
+        _token.approve(address(_deployer), _deployer.settings().bounty());
+        address market = _deployer.deployMarket(msg.sender);
+
+        vm.startPrank(_voter);
+        OpinionMarket(market).commitVote(_commitment);
+        vm.stopPrank();
+
+        (, bytes32 c) = OpinionMarket(market).votes(_voter);
+        assertEq(c, _commitment);
+    }
+
+    function testFailCommitTooManyVotes() public {
+        _token.approve(address(_deployer), _deployer.settings().bounty());
+        address market = _deployer.deployMarket(msg.sender);
+
+        for (uint8 i = 0; i < _deployer.settings().maxVoters() + 1; i++) {
+            address randomAddress = address(uint160(uint(keccak256(abi.encodePacked(block.timestamp, i)))));
+            vm.startPrank(randomAddress);
+            OpinionMarket(market).commitVote(bytes32(keccak256(abi.encodePacked(block.timestamp, i))));
+            vm.stopPrank();
+        }
+
+        vm.expectRevert();
+    }
+
+    function testCommitMaxVotes() public {
+        _token.approve(address(_deployer), _deployer.settings().bounty());
+        address market = _deployer.deployMarket(msg.sender);
+
+        for (uint8 i = 0; i < _deployer.settings().maxVoters(); i++) {
+            address randomAddress = address(uint160(uint(keccak256(abi.encodePacked(block.timestamp, i)))));
+            vm.startPrank(randomAddress);
+            OpinionMarket(market).commitVote(bytes32(keccak256(abi.encodePacked(block.timestamp, i))));
+            vm.stopPrank();
+        }
+    }
+
+    function testClaimFee(uint256 _amount1, uint256 _amount2, bytes32 _salt) public {
         vm.assume(_amount1 > 0);
         vm.assume(_amount2 > 0);
         vm.assume(_amount1 > 100000000);
@@ -180,15 +213,15 @@ contract OpinionMarketTest is Test {
         vm.assume(_amount1 + _amount2 < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
 
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(address(this));
 
         vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.Yes, _amount1));
+        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount1, _salt);
         OpinionMarket(market).commitBet(commitment);
         vm.stopPrank();
 
         vm.startPrank(_exampleAddress2);
-        bytes32 commitment2 = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.No, _amount2));
+        bytes32 commitment2 = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.No, _amount2, _salt);
         OpinionMarket(market).commitBet(commitment2);
         vm.stopPrank();
         skip(2 days);
@@ -197,15 +230,15 @@ contract OpinionMarketTest is Test {
         _token.transfer(_exampleAddress2, _amount2);
         
         vm.startPrank(_exampleAddress);
-        _token.approve(market, _amount1);
+        _token.approve(address(_deployer), _amount1);
         vm.stopPrank();
 
         vm.startPrank(_exampleAddress2);
-        _token.approve(market, _amount2);
+        _token.approve(address(_deployer), _amount2);
         vm.stopPrank();
         
-        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount1);
-        IOpinionMarket(market).revealBet(_exampleAddress2, IOpinionMarket.VoteChoice.No, _amount2);
+        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount1, _salt);
+        IOpinionMarket(market).revealBet(_exampleAddress2, IOpinionMarket.VoteChoice.No, _amount2, _salt);
 
         assertEq(OpinionMarket(market).yesVolume(), _amount1);
         assertEq(OpinionMarket(market).noVolume(), _amount2);
@@ -217,13 +250,12 @@ contract OpinionMarketTest is Test {
         uint256 operatorFee = losingPoolVolume * _deployer.settings().operatorFee() / 10**_deployer.settings().tokenUnits();
         uint256 marketMakerFee = losingPoolVolume * _deployer.settings().marketMakerFee() / 10**_deployer.settings().tokenUnits();
         uint256 oldBalance = IERC20(_token).balanceOf(address(this));
+        
         IOpinionMarket(market).claimFees();
         assertEq(oldBalance + marketMakerFee + operatorFee, IERC20(_token).balanceOf(address(this)));
     }
 
-
-
-    function testClaimBet(uint256 _amount1, uint256 _amount2) public {
+    function testClaimBet(uint256 _amount1, uint256 _amount2, bytes32 _salt) public {
         vm.assume(_amount1 > 0);
         vm.assume(_amount2 > 0);
         vm.assume(_amount1 > 100000000);
@@ -233,15 +265,15 @@ contract OpinionMarketTest is Test {
         vm.assume(_amount1 + _amount2 < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
 
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket('fake_actionId');
+        address market = _deployer.deployMarket(msg.sender);
         
         vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.Yes, _amount1));
+        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount1, _salt);
         OpinionMarket(market).commitBet(commitment);
         vm.stopPrank();
 
         vm.startPrank(_exampleAddress2);
-        bytes32 commitment2 = IOpinionMarket(market).hashBet(IOpinionMarket.Bet(IOpinionMarket.VoteChoice.No, _amount2));
+        bytes32 commitment2 = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.No, _amount2, _salt);
         OpinionMarket(market).commitBet(commitment2);
         vm.stopPrank();
 
@@ -251,15 +283,15 @@ contract OpinionMarketTest is Test {
         _token.transfer(_exampleAddress2, _amount2);
         
         vm.startPrank(_exampleAddress);
-        _token.approve(market, _amount1);
+        _token.approve(address(_deployer), _amount1);
         vm.stopPrank();
 
         vm.startPrank(_exampleAddress2);
-        _token.approve(market, _amount2);
+        _token.approve(address(_deployer), _amount2);
         vm.stopPrank();
         
-        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount1);
-        IOpinionMarket(market).revealBet(_exampleAddress2, IOpinionMarket.VoteChoice.No, _amount2);
+        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount1, _salt);
+        IOpinionMarket(market).revealBet(_exampleAddress2, IOpinionMarket.VoteChoice.No, _amount2, _salt);
 
         assertEq(OpinionMarket(market).yesVolume(), _amount1);
         assertEq(OpinionMarket(market).noVolume(), _amount2);
@@ -269,11 +301,19 @@ contract OpinionMarketTest is Test {
         // losingPoolVolume always equals yesVolume when no votes are revealed
         uint256 losingPoolVolume = OpinionMarket(market).yesVolume();
         vm.startPrank(_exampleAddress2);
-        console.log(_amount2);
-        console.log(IERC20(_token).balanceOf(_exampleAddress2));
         IOpinionMarket(market).claimBet();
         uint256 feeAndBounties = OpinionMarket(market).calculateTotalFeeAmount(losingPoolVolume) + _deployer.settings().bounty();
         assertEq(IERC20(_token).balanceOf(market), feeAndBounties);
         vm.stopPrank();
+    }
+
+    function testEndDateSetProperly() public {
+        _token.approve(address(_deployer), _deployer.settings().bounty());
+        address market = _deployer.deployMarket(msg.sender);
+        assertEq(OpinionMarket(market).endDate(), block.timestamp + _deployer.settings().duration());
+    }
+
+    function testEmergencyWithdraw() public {
+        // commit vote and reveal on a deployed market
     }
 }

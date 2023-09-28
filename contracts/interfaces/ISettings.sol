@@ -4,10 +4,9 @@ pragma solidity 0.8.20;
 interface ISettings {
     error Unauthorized();
 
-    event AppIdChanged(string newAppId);
+    event MaxVoters(uint8 newMaxVoters);
     event TokenChanged(address newToken);
     event BountyChanged(uint256 newBounty);
-    event WorldIDChanged(address newWorldID);
     event OperatorChanged(address newOperator);
     event DurationChanged(uint256 newDuration);
     event TokenUnitsChanged(uint8 newTokenUnits);
@@ -18,15 +17,13 @@ interface ISettings {
 
     function bounty() external view returns (uint256);
 
-    function worldId() external view returns (address);
-
     function operator() external view returns (address);
 
     function duration() external view returns (uint256);
 
-    function tokenUnits() external view returns (uint8);
+    function maxVoters() external view returns (uint8);
 
-    function appId() external view returns (string memory);
+    function tokenUnits() external view returns (uint8);
 
     function operatorFee() external view returns (uint256);
 
@@ -36,13 +33,11 @@ interface ISettings {
 
     function setBounty(uint256 _bounty) external;
 
-    function setWorldId(address _worldID) external;
-
     function setOperator(address _operator) external;
 
-    function setAppId(string memory _appId) external;
-
     function setDuration(uint256 _duration) external;
+
+    function setMaxVoters(uint8 _maxVoters) external;
 
     function setTokenUnits(uint8 _tokenUnits) external;
 

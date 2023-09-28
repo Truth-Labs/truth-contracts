@@ -13,18 +13,25 @@ interface IOpinionMarket {
     struct Bet {
         VoteChoice opinion;
         uint256 amount;
+        bytes32 commitment;
     }
 
     struct Vote {
         VoteChoice opinion;
-        uint256 nullifierHash;
+        bytes32 commitment;
     }
+
+    /// @notice Thrown when max bettors is reached
+    error MaxBettors(uint8 maxBettors);
 
     /// @notice Thrown when trying to bet again
     error AlreadyBet(address account);
 
-    /// @notice Thrown when attempting to reveal a vote that has not been committed, already revealed, or resolved market
-    error AlreadyRevealed(address account, VoteChoice opinion, uint256 amount);
+    /// @notice Thrown when trying to vote again
+    error AlreadyVoted(address account);
+
+    /// @notice Thrown when attempting to reveal a bet with a 0 amount
+    error InvalidAmount(address account);
 
     /// @notice Thrown when attempting to reuse a nullifier
     error InvalidNullifier();
@@ -54,24 +61,20 @@ interface IOpinionMarket {
     error MarketIsNotClosed();
 
     event BetCommitted(address indexed user, bytes32 commitment);
+    event VoteCommitted(address indexed voter, bytes32 commitment);
     event VoteRevealed(address indexed voter, VoteChoice opinion);
     event BetRevealed(address indexed user, VoteChoice opinion);
     event BetClaimed(address indexed user, uint256 payout);
     event VoteClaimed(address indexed voter, uint256 payout);
     event FeesClaimed(address indexed marketMaker, address indexed operator, uint256 amount);
-
+    
     function commitBet(bytes32 _commitment) external;
 
-    function revealBet(address _user, VoteChoice _opinion, uint256 _amount) external;
+    function commitVote(bytes32 _commitment) external;
 
-    function revealVote(
-        address _voter,
-        VoteChoice _opinion,
-        address _signal,
-        uint256 _root,
-        uint256 _nullifierHash,
-        uint256[8] calldata _proof
-    ) external;
+    function revealBet(address _user, VoteChoice _opinion, uint256 _amount, bytes32 _salt) external;
+
+    function revealVote(address _voter, VoteChoice _opinion, bytes32 _salt) external;
 
     function closeMarket() external;
 
@@ -93,5 +96,9 @@ interface IOpinionMarket {
 
     function calculateVoterPayout(address _voter) external view returns (uint256);
 
-    function hashBet(Bet memory _bet) external pure returns (bytes32);
+    function hashBet(VoteChoice _opinion, uint256 _amount, bytes32 _salt) external pure returns (bytes32);
+
+    function hashVote(VoteChoice _opinion, bytes32 _salt) external pure returns (bytes32);
+
+    function emergencyWithdraw() external;
 }

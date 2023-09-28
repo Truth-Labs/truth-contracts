@@ -17,14 +17,6 @@ contract SettingsTest is Test {
         assertEq(_settings.token(), address(this));
     }
 
-    function testAppId() public {
-        assertEq(_settings.appId(), "app_staging_544ecba40d9da7599b01e0beef4c09c3");
-    }
-
-    function testWorldId() public {
-        assertEq(_settings.worldId(), 0x719683F13Eeea7D84fCBa5d7d17Bf82e03E3d260);
-    }
-
     function testOperator() public {
         assertEq(_settings.operator(), address(this));
     }
@@ -49,19 +41,13 @@ contract SettingsTest is Test {
         assertEq(_settings.marketMakerFee(), 10000);
     }
 
+    function testMaxVoters() public {
+        assertEq(_settings.maxVoters(), 25);
+    }
+
     function testSetToken() public {
         _settings.setToken(address(0x1));
         assertEq(_settings.token(), address(0x1));
-    }
-
-    function testSetAppId() public {
-        _settings.setAppId("app_staging_544ecba40d9da7599b01e0beef4c09c4");
-        assertEq(_settings.appId(), "app_staging_544ecba40d9da7599b01e0beef4c09c4");
-    }
-
-    function testSetWorldId() public {
-        _settings.setWorldId(address(0x2));
-        assertEq(_settings.worldId(), address(0x2));
     }
 
     function testSetOperator() public {
@@ -94,19 +80,14 @@ contract SettingsTest is Test {
         assertEq(_settings.marketMakerFee(), 10001);
     }
 
+    function testSetMaxVoters() public {
+        _settings.setMaxVoters(26);
+        assertEq(_settings.maxVoters(), 26);
+    }
+
     function testFailSetTokenNotOperator() public {
         vm.prank(address(0));
         _settings.setToken(address(0x1));
-    }
-
-    function testFailSetAppIdNotOperator() public {
-        vm.prank(address(0));
-        _settings.setAppId("app_staging_544ecba40d9da7599b01e0beef4c09c4");
-    }
-
-    function testFailSetWorldIdNotOperator() public {
-        vm.prank(address(0));
-        _settings.setWorldId(address(0x2));
     }
 
     function testFailSetOperatorNotOperator() public {
@@ -137,5 +118,10 @@ contract SettingsTest is Test {
     function testFailSetMarketMakerFeeNotOperator() public {
         vm.prank(address(0));
         _settings.setMarketMakerFee(10001);
+    }
+
+    function testFailSetMaxVotersNotOperator() public {
+        vm.prank(address(0));
+        _settings.setMaxVoters(26);
     }
 }

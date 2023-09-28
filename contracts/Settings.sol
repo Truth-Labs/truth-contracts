@@ -6,13 +6,12 @@ import "./interfaces/ISettings.sol";
 contract Settings is ISettings {
     address public token;
     address public operator;
-    address public worldId = 0x719683F13Eeea7D84fCBa5d7d17Bf82e03E3d260; // mumbai testnet
-    string public appId = "app_staging_544ecba40d9da7599b01e0beef4c09c3"; // truth staging app id
     uint256 public bounty = 50000000; // 50 USDC
     uint256 public duration = 1 days;
-    uint8 public tokenUnits = 6;
     uint256 public operatorFee = 10000; // 1%
     uint256 public marketMakerFee = 10000; // 1%
+    uint8 public tokenUnits = 6;
+    uint8 public maxVoters = 25;
 
     modifier onlyOperator() {
         if (msg.sender != operator) revert Unauthorized();
@@ -22,6 +21,11 @@ contract Settings is ISettings {
     constructor(address _token, address _operator) {
         token = _token;
         operator = _operator;
+    }
+
+    function setMaxVoters(uint8 _maxVoters) external onlyOperator {
+        maxVoters = _maxVoters;
+        emit MaxVoters(_maxVoters);
     }
 
     function setToken(address _token) external onlyOperator {
@@ -34,19 +38,9 @@ contract Settings is ISettings {
         emit BountyChanged(_bounty);
     }
 
-    function setAppId(string memory _appId) external onlyOperator {
-        appId = _appId;
-        emit AppIdChanged(_appId);
-    }
-
     function setOperator(address _operator) external onlyOperator {
         operator = _operator;
         emit OperatorChanged(_operator);
-    }
-
-    function setWorldId(address _worldID) external onlyOperator {
-        worldId = _worldID;
-        emit WorldIDChanged(_worldID);
     }
 
     function setDuration(uint256 _duration) external onlyOperator {
