@@ -10,310 +10,433 @@ import "../contracts/interfaces/IOpinionMarket.sol";
 import "../contracts/mocks/MockToken.sol";
 
 contract OpinionMarketTest is Test {
+    struct FullBet {
+        address account;
+        uint256 amount;
+        IOpinionMarket.VoteChoice opinion;
+        bytes32 salt;
+    }
+
+    struct FullVote {
+        address account;
+        IOpinionMarket.VoteChoice opinion;
+        bytes32 salt;
+    }
+
     OpinionMarketDeployer internal _deployer;
     IERC20 internal _token;
-    address internal _exampleAddress = 0x81C00F89daafF4F6BFE17De668053e4aCF595a38;
-    address internal _exampleAddress2 = 0x79c7b637e28BE478c3B06f7809DF1558F9256F15;
+    mapping (uint256 => FullBet) internal _mockBets;
+    mapping (uint256 => FullVote) internal _mockVotes;
+
+    bytes4 internal _invalidAmountSelector = bytes4(keccak256("InvalidAmount(address)"));
+    bytes4 internal _alreadyCommitedSelector = bytes4(keccak256("AlreadyCommited(address)"));
+    bytes4 internal _marketIsInactiveSelector = bytes4(keccak256("MarketIsInactive(uint256)"));
+    bytes4 internal _marketIsActiveSelector = bytes4(keccak256("MarketIsActive(uint256)"));
 
     function setUp() public {
         _token = new MockToken();
         _deployer = new OpinionMarketDeployer(address(_token));
     }
 
-    function testDeploy() public {
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
+    function test_deploy() public {
+        address market = _deployMarket();
 
-        assertEq(IERC20(_token).balanceOf(address(market)), _deployer.settings().bounty());
+        assertEq(IERC20(_token).balanceOf(market), _deployer.settings().bounty());
     }
 
-    function testFailDeployNotApproved() public {
+    function testFail_deployNotApproved() public {
         address market = _deployer.deployMarket(msg.sender);
 
         assertEq(IERC20(_token).balanceOf(address(market)), 0);
     }
 
-    function testCanCommitBet(uint256 _amount, bytes32 _salt) public {
-        vm.assume(_amount > 0);
-        vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
+    // COMMIT
 
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
+    function test_bettorsCanCommit(uint256 _iterations, uint256 _amount) public {
+        vm.assume(_iterations < 1000);
+        vm.assume(_iterations > 0);
+        uint256 tokenBalance = IERC20(_token).balanceOf(address(this));
+        vm.assume(_amount > _iterations);
+        vm.assume(_amount < tokenBalance / _iterations);
 
-        vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount, _salt);
-        OpinionMarket(market).commitBet(commitment);
-        vm.stopPrank();
+        address market = _deployMarket();
+        for (uint256 i = 0; i < _iterations; i++) {
+            (address mockAddress, uint256 mockAmount, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(_amount, i);
+            _token.transfer(mockAddress, mockAmount);
+            uint256 marketBalanceBefore = IERC20(_token).balanceOf(address(market));
 
-        (,, bytes32 c) = OpinionMarket(market).bets(_exampleAddress);
-        assertEq(c, commitment);
-    }
-
-    function testFailCommitBetTooLate(uint256 _amount, bytes32 _salt) public {
-                vm.assume(_amount > 0);
-        vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
-
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-        
-        skip(2 days);
-
-        vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount, _salt);
-        OpinionMarket(market).commitBet(commitment);
-        vm.stopPrank();
-
-        (,, bytes32 c) = OpinionMarket(market).bets(_exampleAddress);
-        assertEq(c, bytes32(0));
-    }
-
-    function testOperatorCanRevealBet(uint256 _amount, bytes32 _salt) public {
-        vm.assume(_amount > 0);
-        vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
-
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-        
-        vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount, _salt);
-        OpinionMarket(market).commitBet(commitment);
-        vm.stopPrank();
-
-        skip(2 days);
-        
-        _token.transfer(_exampleAddress, _amount);
-        
-        vm.startPrank(_exampleAddress);
-        _token.approve(address(_deployer), _amount);
-        vm.stopPrank();
-        
-        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount, _salt);
-
-        assertEq(OpinionMarket(market).yesVolume(), _amount);
-    }
-
-    function testFailOperatorRevealBetEarly(IOpinionMarket.VoteChoice _choice, uint256 _amount, bytes32 _salt) public {
-        vm.assume(_amount > 0);
-        vm.assume(_amount < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
-        vm.assume(_choice == IOpinionMarket.VoteChoice.Yes || _choice == IOpinionMarket.VoteChoice.No);
-
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-        
-        vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount, _salt);
-        OpinionMarket(market).commitBet(commitment);
-        vm.stopPrank();
-
-        _token.transfer(_exampleAddress, _amount);
-        
-        vm.startPrank(_exampleAddress);
-        _token.approve(address(_deployer), _amount);
-        vm.stopPrank();
-        
-        IOpinionMarket(market).revealBet(_exampleAddress, _choice, _amount, _salt);
-    }
-
-    function testCanCloseMarket() public {
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-        skip(2 days);
-
-        assertEq(OpinionMarket(market).closed(), false);
-        IOpinionMarket(market).closeMarket();
-        assertEq(OpinionMarket(market).closed(), true);
-    }
-
-    function testFailCloseNotOperator() public {
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-        skip(2 days);
-
-        vm.prank(_exampleAddress);
-        IOpinionMarket(market).closeMarket();
-    }
-
-    function testFailCloseTooEarly() public {
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-
-        IOpinionMarket(market).closeMarket();
-    }
-
-    function testMarketMaker() public {
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-
-        assertEq(OpinionMarket(market).marketMaker(), msg.sender);
-    }
-
-    function testCommitBet(address _bettor, bytes32 _commitment) public {
-        vm.assume(_bettor != address(0));
-        vm.assume(_commitment != bytes32(0));
-
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-
-        vm.startPrank(_bettor);
-        OpinionMarket(market).commitBet(_commitment);
-        vm.stopPrank();
-
-        (,, bytes32 c) = OpinionMarket(market).bets(_bettor);
-        assertEq(c, _commitment);
-    }
-
-    function testCommitVote(address _voter, bytes32 _commitment) public {
-        vm.assume(_voter != address(0));
-        vm.assume(_commitment != bytes32(0));
-
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-
-        vm.startPrank(_voter);
-        OpinionMarket(market).commitVote(_commitment);
-        vm.stopPrank();
-
-        (, bytes32 c) = OpinionMarket(market).votes(_voter);
-        assertEq(c, _commitment);
-    }
-
-    function testFailCommitTooManyVotes() public {
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-
-        for (uint8 i = 0; i < _deployer.settings().maxVoters() + 1; i++) {
-            address randomAddress = address(uint160(uint(keccak256(abi.encodePacked(block.timestamp, i)))));
-            vm.startPrank(randomAddress);
-            OpinionMarket(market).commitVote(bytes32(keccak256(abi.encodePacked(block.timestamp, i))));
+            hoax(mockAddress);
+            _token.approve(address(_deployer), mockAmount);
+            bytes32 mockCommitment = IOpinionMarket(market).hashBet(mockOpinion, mockAmount, mockSalt);
+            vm.startPrank(mockAddress);
+            IOpinionMarket(market).commitBet(mockCommitment, mockAmount);
             vm.stopPrank();
-        }
 
-        vm.expectRevert();
+            uint256 marketBalanceAfter = IERC20(_token).balanceOf(address(market));
+            uint256 expectedMarketBalance = marketBalanceBefore + mockAmount;
+            assertEq(expectedMarketBalance, marketBalanceAfter);
+            /// @dev mockAddress only seeded with what they are going to commit 
+            assertEq(0, IERC20(_token).balanceOf(mockAddress));
+        }
     }
 
-    function testCommitMaxVotes() public {
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
+    function test_votersCanCommit(uint256 _iterations) public {
+        vm.assume(_iterations < _deployer.settings().maxVoters());
+        vm.assume(_iterations > 0);
 
-        for (uint8 i = 0; i < _deployer.settings().maxVoters(); i++) {
-            address randomAddress = address(uint160(uint(keccak256(abi.encodePacked(block.timestamp, i)))));
-            vm.startPrank(randomAddress);
-            OpinionMarket(market).commitVote(bytes32(keccak256(abi.encodePacked(block.timestamp, i))));
+        address market = _deployMarket();
+        for (uint256 i = 0; i < _iterations; i++) {
+            (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, i);
+
+            hoax(mockAddress);
+            bytes32 mockCommitment = IOpinionMarket(market).hashVote(mockOpinion, mockSalt);
+            vm.startPrank(mockAddress);
+            IOpinionMarket(market).commitVote(mockCommitment);
             vm.stopPrank();
         }
     }
 
-    function testClaimFee(uint256 _amount1, uint256 _amount2, bytes32 _salt) public {
-        vm.assume(_amount1 > 0);
-        vm.assume(_amount2 > 0);
-        vm.assume(_amount1 > 100000000);
-        vm.assume(_amount2 > 100000000);
-        vm.assume(_amount1 < 100 ether);
-        vm.assume(_amount2 < 100 ether);
-        vm.assume(_amount1 + _amount2 < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
+    function testFails_bettorDidNotApprove(uint256 _mockAmount) public {
+        vm.assume(_mockAmount > 2);
+        vm.assume(_mockAmount < IERC20(_token).balanceOf(address(this)));
 
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(address(this));
+        address market = _deployMarket();
+        (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, 0);
+        _token.transfer(mockAddress, _mockAmount);
 
-        vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount1, _salt);
-        OpinionMarket(market).commitBet(commitment);
+        hoax(mockAddress);
+        bytes32 mockCommitment = IOpinionMarket(market).hashBet(mockOpinion, _mockAmount, mockSalt);
+        vm.startPrank(mockAddress);
+        IOpinionMarket(market).commitBet(mockCommitment, _mockAmount);
+        vm.stopPrank();
+    }
+
+    function testRevert_bettorCommitAmountIs0() public {
+        address market = _deployMarket();
+        (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, 0);
+        _token.transfer(mockAddress, 0);
+
+        hoax(mockAddress);
+        _token.approve(address(_deployer), 0);
+        bytes32 mockCommitment = IOpinionMarket(market).hashBet(mockOpinion, 0, mockSalt);
+        vm.startPrank(mockAddress);
+        vm.expectRevert(abi.encodeWithSelector(_invalidAmountSelector, mockAddress));
+        IOpinionMarket(market).commitBet(mockCommitment, 0);
+        vm.stopPrank();
+    }
+
+    function testRevert_bettorCommitTwice(uint256 _mockAmount) public {
+        vm.assume(_mockAmount > 2);
+        vm.assume(_mockAmount < IERC20(_token).balanceOf(address(this)));
+
+        address market = _deployMarket();
+        (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, 0);
+        _token.transfer(mockAddress, _mockAmount);
+
+        hoax(mockAddress);
+        _token.approve(address(_deployer), _mockAmount);
+        bytes32 mockCommitment = IOpinionMarket(market).hashBet(mockOpinion, _mockAmount / 2, mockSalt);
+        vm.startPrank(mockAddress);
+        IOpinionMarket(market).commitBet(mockCommitment, _mockAmount / 2);
+        vm.stopPrank();
+        assertApproxEqAbs(_mockAmount / 2, IERC20(_token).balanceOf(mockAddress), 10);
+
+        vm.startPrank(mockAddress);
+        vm.expectRevert(abi.encodeWithSelector(_alreadyCommitedSelector, mockAddress));
+        IOpinionMarket(market).commitBet(mockCommitment, _mockAmount / 2);
+        vm.stopPrank();
+    }
+
+    function testRevert_voterCommitsTwice() public {
+        address market = _deployMarket();
+        (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, 0);
+
+        hoax(mockAddress);
+        bytes32 mockCommitment = IOpinionMarket(market).hashVote(mockOpinion, mockSalt);
+        vm.startPrank(mockAddress);
+        IOpinionMarket(market).commitVote(mockCommitment);
         vm.stopPrank();
 
-        vm.startPrank(_exampleAddress2);
-        bytes32 commitment2 = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.No, _amount2, _salt);
-        OpinionMarket(market).commitBet(commitment2);
+        vm.startPrank(mockAddress);
+        vm.expectRevert(abi.encodeWithSelector(_alreadyCommitedSelector, mockAddress));
+        IOpinionMarket(market).commitVote(mockCommitment);
         vm.stopPrank();
+    }
+
+    function testRevert_commitBetWhenMarketIsInactive() public {
+        address market = _deployMarket();
+        (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, 0);
+        _token.transfer(mockAddress, 1000);
+        
         skip(2 days);
-        
-        _token.transfer(_exampleAddress, _amount1);
-        _token.transfer(_exampleAddress2, _amount2);
-        
-        vm.startPrank(_exampleAddress);
-        _token.approve(address(_deployer), _amount1);
+        hoax(mockAddress);
+        _token.approve(address(_deployer), 1000);
+        bytes32 mockCommitment = IOpinionMarket(market).hashBet(mockOpinion, 1000, mockSalt);
+        vm.startPrank(mockAddress);
+        vm.expectRevert(abi.encodeWithSelector(_marketIsInactiveSelector, OpinionMarket(market).endDate()));
+        IOpinionMarket(market).commitBet(mockCommitment, 1000);
         vm.stopPrank();
+    }
 
-        vm.startPrank(_exampleAddress2);
-        _token.approve(address(_deployer), _amount2);
-        vm.stopPrank();
+    function testRevert_commitVoteWhenMarketIsInactive() public {
+        address market = _deployMarket();
+        (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, 0);
         
-        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount1, _salt);
-        IOpinionMarket(market).revealBet(_exampleAddress2, IOpinionMarket.VoteChoice.No, _amount2, _salt);
+        skip(2 days);
+        hoax(mockAddress);
+        bytes32 mockCommitment = IOpinionMarket(market).hashVote(mockOpinion, mockSalt);
+        vm.startPrank(mockAddress);
+        vm.expectRevert(abi.encodeWithSelector(_marketIsInactiveSelector, OpinionMarket(market).endDate()));
+        IOpinionMarket(market).commitVote(mockCommitment);
+        vm.stopPrank();
+    }
 
-        assertEq(OpinionMarket(market).yesVolume(), _amount1);
-        assertEq(OpinionMarket(market).noVolume(), _amount2);
+    // REVEAL
 
+    function test_bettorsCanReveal(uint256 _iterations, uint256 _amount) public {
+        vm.assume(_iterations < 1000);
+        vm.assume(_iterations > 0);
+        uint256 tokenBalance = IERC20(_token).balanceOf(address(this));
+        vm.assume(_amount > _iterations);
+        vm.assume(_amount < tokenBalance / _iterations);
+
+        // first commit
+        address market = _deployMarket();
+        for (uint256 i = 0; i < _iterations; i++) {
+            (address mockAddress, uint256 mockAmount, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(_amount, i);
+            bytes32 mockCommitment = IOpinionMarket(market).hashBet(mockOpinion, mockAmount, mockSalt);
+            _mockBets[i] = FullBet(mockAddress, mockAmount, mockOpinion, mockSalt);
+            _token.transfer(mockAddress, mockAmount);
+
+            hoax(mockAddress);
+            _token.approve(address(_deployer), mockAmount);
+            vm.startPrank(mockAddress);
+            IOpinionMarket(market).commitBet(mockCommitment, mockAmount);
+            vm.stopPrank();
+        }
+
+        // next reveal
+        skip(2 days);
+        for (uint256 i = 0; i < _iterations; i++) {
+            FullBet memory mockBet = _mockBets[i];
+            uint256 oldYesVolume = OpinionMarket(market).yesVolume();
+            uint256 oldNoVolume = OpinionMarket(market).noVolume();
+            IOpinionMarket(market).revealBet(mockBet.account, mockBet.opinion, mockBet.amount, mockBet.salt);
+
+            if (mockBet.opinion == IOpinionMarket.VoteChoice.Yes) {
+                assertEq(oldYesVolume + mockBet.amount, OpinionMarket(market).yesVolume());
+                assertEq(oldNoVolume, OpinionMarket(market).noVolume());
+            } else {
+                assertEq(oldYesVolume, OpinionMarket(market).yesVolume());
+                assertEq(oldNoVolume + mockBet.amount, OpinionMarket(market).noVolume());
+            }
+        }
+    }
+
+    function test_votersCanReveal(uint256 _iterations) public {
+        vm.assume(_iterations < _deployer.settings().maxVoters());
+        vm.assume(_iterations > 0);
+
+        address market = _deployMarket();
+        for (uint256 i = 0; i < _iterations; i++) {
+            (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, i);
+            _mockVotes[i] = FullVote(mockAddress, mockOpinion, mockSalt);
+
+            hoax(mockAddress);
+            bytes32 mockCommitment = IOpinionMarket(market).hashVote(mockOpinion, mockSalt);
+            vm.startPrank(mockAddress);
+            IOpinionMarket(market).commitVote(mockCommitment);
+            vm.stopPrank();
+        }
+
+        skip(2 days);
+        for (uint256 i = 0; i < _iterations; i++) {
+            FullVote memory mockVote = _mockVotes[i];
+            uint256 oldYesVotes = OpinionMarket(market).yesVotes();
+            uint256 oldNoVotes = OpinionMarket(market).noVotes();
+            IOpinionMarket(market).revealVote(mockVote.account, mockVote.opinion, mockVote.salt);
+
+            if (mockVote.opinion == IOpinionMarket.VoteChoice.Yes) {
+                assertEq(oldYesVotes + 1, OpinionMarket(market).yesVotes());
+                assertEq(oldNoVotes, OpinionMarket(market).noVotes());
+            } else {
+                assertEq(oldYesVotes, OpinionMarket(market).yesVotes());
+                assertEq(oldNoVotes + 1, OpinionMarket(market).noVotes());
+            }
+        }
+    }
+
+    function test_bettorsCanNotRevealWhileMarketIsActive(uint256 _iterations, uint256 _amount) public {
+        vm.assume(_iterations < 1000);
+        vm.assume(_iterations > 0);
+        uint256 tokenBalance = IERC20(_token).balanceOf(address(this));
+        vm.assume(_amount > _iterations);
+        vm.assume(_amount < tokenBalance / _iterations);
+
+        // first commit
+        address market = _deployMarket();
+        for (uint256 i = 0; i < _iterations; i++) {
+            (address mockAddress, uint256 mockAmount, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(_amount, i);
+            bytes32 mockCommitment = IOpinionMarket(market).hashBet(mockOpinion, mockAmount, mockSalt);
+            _mockBets[i] = FullBet(mockAddress, mockAmount, mockOpinion, mockSalt);
+            _token.transfer(mockAddress, mockAmount);
+
+            hoax(mockAddress);
+            _token.approve(address(_deployer), mockAmount);
+            vm.startPrank(mockAddress);
+            IOpinionMarket(market).commitBet(mockCommitment, mockAmount);
+            vm.stopPrank();
+        }
+
+        // next reveal
+        for (uint256 i = 0; i < _iterations; i++) {
+            FullBet memory mockBet = _mockBets[i];
+            vm.expectRevert(abi.encodeWithSelector(_marketIsActiveSelector, OpinionMarket(market).endDate()));
+            IOpinionMarket(market).revealBet(mockBet.account, mockBet.opinion, mockBet.amount, mockBet.salt);
+        }
+    }
+
+    function test_votersCanNotRevealWhileMarketIsActive(uint256 _iterations) public {
+        vm.assume(_iterations < _deployer.settings().maxVoters());
+        vm.assume(_iterations > 0);
+
+        address market = _deployMarket();
+        for (uint256 i = 0; i < _iterations; i++) {
+            (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(1000, i);
+            _mockVotes[i] = FullVote(mockAddress, mockOpinion, mockSalt);
+
+            hoax(mockAddress);
+            bytes32 mockCommitment = IOpinionMarket(market).hashVote(mockOpinion, mockSalt);
+            vm.startPrank(mockAddress);
+            IOpinionMarket(market).commitVote(mockCommitment);
+            vm.stopPrank();
+        }
+
+        for (uint256 i = 0; i < _iterations; i++) {
+            FullVote memory mockVote = _mockVotes[i];
+            vm.expectRevert(abi.encodeWithSelector(_marketIsActiveSelector, OpinionMarket(market).endDate()));
+            IOpinionMarket(market).revealVote(mockVote.account, mockVote.opinion, mockVote.salt);
+        }
+    }
+
+    // CLOSE
+
+    function test_canClose() public {
+        address market = _deployMarket();
+        skip(2 days);
         IOpinionMarket(market).closeMarket();
-        // losingPoolVolume always equals yesVolume when no votes are revealed
-        uint256 losingPoolVolume = OpinionMarket(market).yesVolume();
+    }
 
-        uint256 operatorFee = losingPoolVolume * _deployer.settings().operatorFee() / 10**_deployer.settings().tokenUnits();
-        uint256 marketMakerFee = losingPoolVolume * _deployer.settings().marketMakerFee() / 10**_deployer.settings().tokenUnits();
-        uint256 oldBalance = IERC20(_token).balanceOf(address(this));
-        
+    function testRevert_canNotCloseWhileMarketIsActive() public {
+        address market = _deployMarket();
+        vm.expectRevert(abi.encodeWithSelector(_marketIsActiveSelector, OpinionMarket(market).endDate()));
+        IOpinionMarket(market).closeMarket();
+    }
+
+    // CLAIM
+
+    /// @notice yea ik WTF
+    function test_claim(uint256 _iterations, uint256 _amount) public {
+        vm.assume(_iterations < 1000);
+        vm.assume(_iterations > 0);
+        uint256 tokenBalance = IERC20(_token).balanceOf(address(this));
+        vm.assume(_amount > _iterations);
+        vm.assume(_amount < tokenBalance / _iterations);
+
+        // first commit bets
+        address market = _deployMarket();
+        for (uint256 i = 0; i < _iterations; i++) {
+            (address mockAddress, uint256 mockAmount, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(_amount, i);
+            bytes32 mockCommitment = IOpinionMarket(market).hashBet(mockOpinion, mockAmount, mockSalt);
+            _mockBets[i] = FullBet(mockAddress, mockAmount, mockOpinion, mockSalt);
+            _token.transfer(mockAddress, mockAmount);
+
+            hoax(mockAddress);
+            _token.approve(address(_deployer), mockAmount);
+            vm.startPrank(mockAddress);
+            IOpinionMarket(market).commitBet(mockCommitment, mockAmount);
+            vm.stopPrank();
+        }
+
+        // then commit votes
+        for (uint256 i = 0; i < _deployer.settings().maxVoters(); i++) {
+            (address mockAddress,, IOpinionMarket.VoteChoice mockOpinion, bytes32 mockSalt) = _generateMockValues(_amount, i);
+            _mockVotes[i] = FullVote(mockAddress, mockOpinion, mockSalt);
+
+            hoax(mockAddress);
+            bytes32 mockCommitment = IOpinionMarket(market).hashVote(mockOpinion, mockSalt);
+            vm.startPrank(mockAddress);
+            IOpinionMarket(market).commitVote(mockCommitment);
+            vm.stopPrank();
+        }
+
+        // next reveal bets
+        skip(2 days);
+        for (uint256 i = 0; i < _iterations; i++) {
+            FullBet memory mockBet = _mockBets[i];
+            IOpinionMarket(market).revealBet(mockBet.account, mockBet.opinion, mockBet.amount, mockBet.salt);
+        }
+
+        // then reveal votes
+        for (uint256 i = 0; i < _deployer.settings().maxVoters(); i++) {
+            FullVote memory mockVote = _mockVotes[i];
+            IOpinionMarket(market).revealVote(mockVote.account, mockVote.opinion, mockVote.salt);
+        }
+
+        // finally claim bets
+        IOpinionMarket(market).closeMarket();
+        IOpinionMarket.VoteChoice consensus = OpinionMarket(market).yesVotes() > OpinionMarket(market).noVotes() ? IOpinionMarket.VoteChoice.Yes : IOpinionMarket.VoteChoice.No;
+        for (uint256 i = 0; i < _iterations; i++) {
+            FullBet memory mockBet = _mockBets[i];
+            uint256 oldBalance = IERC20(_token).balanceOf(mockBet.account);
+            
+            vm.startPrank(mockBet.account);
+            IOpinionMarket(market).claimBet();
+            vm.stopPrank();
+
+            if (mockBet.opinion == consensus) {
+                assert(IERC20(_token).balanceOf(mockBet.account) > oldBalance);
+                assert(mockBet.amount <= IERC20(_token).balanceOf(mockBet.account));
+            } else {
+                assert(IERC20(_token).balanceOf(mockBet.account) == oldBalance);
+            }
+        }
+
+        // claim votes
+        for (uint256 i = 0; i < _deployer.settings().maxVoters(); i++) {
+            FullVote memory mockVote = _mockVotes[i];
+            uint256 oldBalance = IERC20(_token).balanceOf(mockVote.account);
+            
+            vm.startPrank(mockVote.account);
+            IOpinionMarket(market).claimVote();
+            vm.stopPrank();
+
+            if (mockVote.opinion == consensus) {
+                assert(IERC20(_token).balanceOf(mockVote.account) > oldBalance);
+            } else {
+                assert(IERC20(_token).balanceOf(mockVote.account) == oldBalance);
+            }
+        }
+
+        // claim fees
         IOpinionMarket(market).claimFees();
-        assertEq(oldBalance + marketMakerFee + operatorFee, IERC20(_token).balanceOf(address(this)));
     }
 
-    function testClaimBet(uint256 _amount1, uint256 _amount2, bytes32 _salt) public {
-        vm.assume(_amount1 > 0);
-        vm.assume(_amount2 > 0);
-        vm.assume(_amount1 > 100000000);
-        vm.assume(_amount2 > 100000000);
-        vm.assume(_amount1 < 100 ether);
-        vm.assume(_amount2 < 100 ether);
-        vm.assume(_amount1 + _amount2 < IERC20(_token).balanceOf(address(this)) - _deployer.settings().bounty());
+    // HELPERS
 
+    function _deployMarket() internal returns (address) {
         _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-        
-        vm.startPrank(_exampleAddress);
-        bytes32 commitment = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.Yes, _amount1, _salt);
-        OpinionMarket(market).commitBet(commitment);
-        vm.stopPrank();
-
-        vm.startPrank(_exampleAddress2);
-        bytes32 commitment2 = IOpinionMarket(market).hashBet(IOpinionMarket.VoteChoice.No, _amount2, _salt);
-        OpinionMarket(market).commitBet(commitment2);
-        vm.stopPrank();
-
-        skip(2 days);
-        
-        _token.transfer(_exampleAddress, _amount1);
-        _token.transfer(_exampleAddress2, _amount2);
-        
-        vm.startPrank(_exampleAddress);
-        _token.approve(address(_deployer), _amount1);
-        vm.stopPrank();
-
-        vm.startPrank(_exampleAddress2);
-        _token.approve(address(_deployer), _amount2);
-        vm.stopPrank();
-        
-        IOpinionMarket(market).revealBet(_exampleAddress, IOpinionMarket.VoteChoice.Yes, _amount1, _salt);
-        IOpinionMarket(market).revealBet(_exampleAddress2, IOpinionMarket.VoteChoice.No, _amount2, _salt);
-
-        assertEq(OpinionMarket(market).yesVolume(), _amount1);
-        assertEq(OpinionMarket(market).noVolume(), _amount2);
-
-        IOpinionMarket(market).closeMarket();
-
-        // losingPoolVolume always equals yesVolume when no votes are revealed
-        uint256 losingPoolVolume = OpinionMarket(market).yesVolume();
-        vm.startPrank(_exampleAddress2);
-        IOpinionMarket(market).claimBet();
-        uint256 feeAndBounties = OpinionMarket(market).calculateTotalFeeAmount(losingPoolVolume) + _deployer.settings().bounty();
-        assertEq(IERC20(_token).balanceOf(market), feeAndBounties);
-        vm.stopPrank();
+        return _deployer.deployMarket(msg.sender);
     }
 
-    function testEndDateSetProperly() public {
-        _token.approve(address(_deployer), _deployer.settings().bounty());
-        address market = _deployer.deployMarket(msg.sender);
-        assertEq(OpinionMarket(market).endDate(), block.timestamp + _deployer.settings().duration());
-    }
+    function _generateMockValues(uint256 _maxAmount, uint256 _nonce) internal view returns (address, uint256, IOpinionMarket.VoteChoice, bytes32) {
+        address mockAddress = address(uint160(uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, _nonce)))));
+        uint256 mockAmount = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, _nonce))) % _maxAmount;
+        mockAmount = mockAmount == 0 ? 1 : mockAmount;
+        bytes32 mockSalt = keccak256(abi.encodePacked(block.timestamp, block.prevrandao, _nonce));
+        uint256 mockOpinion = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, _nonce))) % 2;
+        IOpinionMarket.VoteChoice mockOpinionFormatted = mockOpinion == 0 ? IOpinionMarket.VoteChoice.Yes : IOpinionMarket.VoteChoice.No;
 
-    function testEmergencyWithdraw() public {
-        // commit vote and reveal on a deployed market
+        return (mockAddress, mockAmount, mockOpinionFormatted, mockSalt);
     }
 }

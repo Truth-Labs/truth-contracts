@@ -63,21 +63,23 @@ contract OpinionMarket is IOpinionMarket {
 
     /// @notice commit a bet to the market so that reveals can remain trustless
     /// @param _commitment a hashed Bet
-    function commitBet(bytes32 _commitment) external onlyActiveMarkets {
-        if (voteCommitments >= _settings.maxVoters()) revert MaxBettors(_settings.maxVoters());
-        if (bets[msg.sender].commitment != bytes32(0)) revert AlreadyBet(msg.sender);
-        
-        voteCommitments++;
-        bets[msg.sender] = Bet(VoteChoice.Yes, 0, _commitment);
+    function commitBet(bytes32 _commitment, uint256 _amount) external onlyActiveMarkets {
+        if (_amount == 0) revert InvalidAmount(msg.sender);
+        if (bets[msg.sender].commitment != bytes32(0)) revert AlreadyCommited(msg.sender);
+        _payMaster.collect(_settings.token(), msg.sender, _amount);
 
-        emit BetCommitted(msg.sender, _commitment);
+        bets[msg.sender] = Bet(VoteChoice.Yes, _amount, _commitment);
+
+        emit BetCommitted(msg.sender, _amount, _commitment);
     }
 
     /// @notice commit a vote to the market so that reveals can remain trustless
     /// @param _commitment a hashed Vote
     function commitVote(bytes32 _commitment) external onlyActiveMarkets {
-        if (votes[msg.sender].commitment != bytes32(0)) revert AlreadyVoted(msg.sender);
+        if (votes[msg.sender].commitment != bytes32(0)) revert AlreadyCommited(msg.sender);
+        if (voteCommitments > _settings.maxVoters()) revert MaxVoters(_settings.maxVoters());
 
+        voteCommitments++;
         votes[msg.sender] = Vote(VoteChoice.Yes, _commitment);
 
         emit VoteCommitted(msg.sender, _commitment);
@@ -93,12 +95,9 @@ contract OpinionMarket is IOpinionMarket {
     /// @param _amount The amount of the bet
     /// @param _salt The salt used to hash the bet
     function revealBet(address _bettor, VoteChoice _opinion, uint256 _amount, bytes32 _salt) external onlyInactiveMarkets onlyOperator {
-        if (_amount == 0) revert InvalidAmount(_bettor);
         if (hashBet(_opinion, _amount, _salt) != bets[_bettor].commitment) revert InvalidCommitment(_bettor, bets[_bettor].commitment);
-        _payMaster.collect(_settings.token(), _bettor, _amount);
 
         bets[_bettor].opinion = _opinion;
-        bets[_bettor].amount = _amount;
         if (_opinion == VoteChoice.Yes) {
             yesVolume += _amount;
         } else {
@@ -207,6 +206,8 @@ contract OpinionMarket is IOpinionMarket {
     /// @notice calculate the payout for a bettor
     /// @param _user The user who placed the bet
     function calculateBettorPayout(address _user) public view returns (uint256) {
+        if (yesVotes == noVotes) return bets[_user].amount;
+
         VoteChoice consensus = yesVotes > noVotes ? VoteChoice.Yes : VoteChoice.No;
         if (bets[_user].opinion == consensus) {
             uint256 losingPoolVolume = yesVotes > noVotes ? noVolume : yesVolume;

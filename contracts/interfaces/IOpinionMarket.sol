@@ -21,23 +21,17 @@ interface IOpinionMarket {
         bytes32 commitment;
     }
 
-    /// @notice Thrown when max bettors is reached
-    error MaxBettors(uint8 maxBettors);
+    /// @notice Thrown when trying to commit again
+    error AlreadyCommited(address account);
 
-    /// @notice Thrown when trying to bet again
-    error AlreadyBet(address account);
-
-    /// @notice Thrown when trying to vote again
-    error AlreadyVoted(address account);
-
-    /// @notice Thrown when attempting to reveal a bet with a 0 amount
+    /// @notice Thrown when attempting to commit a bet with a 0 amount
     error InvalidAmount(address account);
+
+    /// @notice Thrown when max voters is reached
+    error MaxVoters(uint8 maxVoters);
 
     /// @notice Thrown when attempting to reuse a nullifier
     error InvalidNullifier();
-
-    /// @notice Thrown when too many votes are revealed
-    error MaxVoters();
 
     /// @notice Thrown when attempting to reveal a vote that has not been committed, already revealed, or resolved market
     error FailedTransfer(address account, uint256 amount);
@@ -60,7 +54,7 @@ interface IOpinionMarket {
     /// @notice Thrown when attempting an action that can only be performed after market is closed
     error MarketIsNotClosed();
 
-    event BetCommitted(address indexed user, bytes32 commitment);
+    event BetCommitted(address indexed user,  uint256 amount, bytes32 commitment);
     event VoteCommitted(address indexed voter, bytes32 commitment);
     event VoteRevealed(address indexed voter, VoteChoice opinion);
     event BetRevealed(address indexed user, VoteChoice opinion);
@@ -68,7 +62,7 @@ interface IOpinionMarket {
     event VoteClaimed(address indexed voter, uint256 payout);
     event FeesClaimed(address indexed marketMaker, address indexed operator, uint256 amount);
     
-    function commitBet(bytes32 _commitment) external;
+    function commitBet(bytes32 _commitment, uint256 _amount) external;
 
     function commitVote(bytes32 _commitment) external;
 

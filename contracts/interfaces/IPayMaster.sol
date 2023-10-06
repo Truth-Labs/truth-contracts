@@ -9,6 +9,4 @@ interface IPayMaster {
     error NotAuthorized(address spender);
 
     function collect(address _token, address _from, uint256 _amount) external;
-
-    function addAuthorizedSpender(address spender) external;
 }

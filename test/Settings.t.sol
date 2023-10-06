@@ -8,120 +8,145 @@ import "../contracts/Settings.sol";
 
 contract SettingsTest is Test {
     ISettings internal _settings;
+    bytes4 internal _unauthorizedSelector = bytes4(keccak256("Unauthorized()"));
 
     function setUp() public {
         _settings = new Settings(address(this), address(this));
     }
 
-    function testToken() public {
+    function test_token() public {
         assertEq(_settings.token(), address(this));
     }
 
-    function testOperator() public {
+    function test_operator() public {
         assertEq(_settings.operator(), address(this));
     }
 
-    function testBounty() public {
+    function test_bounty() public {
         assertEq(_settings.bounty(), 50000000);
     }
 
-    function testDuration() public {
+    function test_duration() public {
         assertEq(_settings.duration(), 1 days);
     }
 
-    function testTokenUnits() public {
+    function test_tokenUnits() public {
         assertEq(_settings.tokenUnits(), 6);
     }
 
-    function testOperatorFee() public {
+    function test_operatorFee() public {
         assertEq(_settings.operatorFee(), 10000);
     }
 
-    function testMarketMakerFee() public {
+    function test_marketMakerFee() public {
         assertEq(_settings.marketMakerFee(), 10000);
     }
 
-    function testMaxVoters() public {
+    function test_maxVoters() public {
         assertEq(_settings.maxVoters(), 25);
     }
 
-    function testSetToken() public {
+    function test_setToken() public {
         _settings.setToken(address(0x1));
         assertEq(_settings.token(), address(0x1));
     }
 
-    function testSetOperator() public {
+    function test_setOperator() public {
         _settings.setOperator(address(0x3));
         assertEq(_settings.operator(), address(0x3));
     }
 
-    function testSetBounty() public {
+    function test_setBounty() public {
         _settings.setBounty(25500001);
         assertEq(_settings.bounty(), 25500001);
     }
 
-    function testSetDuration() public {
+    function test_setDuration() public {
         _settings.setDuration(4 days);
         assertEq(_settings.duration(), 4 days);
     }
 
-    function testSetTokenUnits() public {
+    function test_setTokenUnits() public {
         _settings.setTokenUnits(7);
         assertEq(_settings.tokenUnits(), 7);
     }
 
-    function testSetOperatorFee() public {
+    function test_setOperatorFee() public {
         _settings.setOperatorFee(10001);
         assertEq(_settings.operatorFee(), 10001);
     }
 
-    function testSetMarketMakerFee() public {
+    function test_setMarketMakerFee() public {
         _settings.setMarketMakerFee(10001);
         assertEq(_settings.marketMakerFee(), 10001);
     }
 
-    function testSetMaxVoters() public {
+    function test_setMaxVoters() public {
         _settings.setMaxVoters(26);
         assertEq(_settings.maxVoters(), 26);
     }
 
-    function testFailSetTokenNotOperator() public {
+    function testRevert_setTokenNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
         vm.prank(address(0));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setToken(address(0x1));
     }
 
-    function testFailSetOperatorNotOperator() public {
+    function testRevert_setOperatorNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
         vm.prank(address(0));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setOperator(address(0x3));
     }
 
-    function testFailSetBountyNotOperator() public {
+    function testRevert_setBountyNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
         vm.prank(address(0));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setBounty(25500001);
     }
 
-    function testFailSetDurationNotOperator() public {
+    function testRevert_setDurationNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
         vm.prank(address(0));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setDuration(4 days);
     }
 
-    function testFailSetTokenUnitsNotOperator() public {
+    function testRevert_setTokenUnitsNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
         vm.prank(address(0));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setTokenUnits(7);
     }
 
-    function testFailSetOperatorFeeNotOperator() public {
+    function testRevert_setOperatorFeeNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
         vm.prank(address(0));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setOperatorFee(10001);
     }
 
-    function testFailSetMarketMakerFeeNotOperator() public {
+    function testRevert_setMarketMakerFeeNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
         vm.prank(address(0));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setMarketMakerFee(10001);
     }
 
-    function testFailSetMaxVotersNotOperator() public {
+    function testRevert_setMaxVotersNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
         vm.prank(address(0));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setMaxVoters(26);
     }
 }

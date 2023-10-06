@@ -28,7 +28,7 @@ contract PayMaster is IPayMaster {
         }
     }
 
-    function addAuthorizedSpender(address spender) public onlyOwner {
+    function addAuthorizedSpender(address spender) internal onlyOwner {
         _authorizedSpenders[spender] = true;
     }
 }
