@@ -5,6 +5,7 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/IOpinionMarket.sol";
 import "./interfaces/ISettings.sol";
+import "./interfaces/IVoterRegistry.sol";
 import "./interfaces/IPayMaster.sol";
 import "./libraries/PercentageMath.sol";
 
@@ -12,6 +13,7 @@ contract OpinionMarket is IOpinionMarket {
     using PercentageMath for uint256;
 
     ISettings private _settings;
+    IVoterRegistry private _voterRegistry;
     IPayMaster private _payMaster;
     address public marketMaker;
     uint8 public voteCommitments;
@@ -25,6 +27,7 @@ contract OpinionMarket is IOpinionMarket {
 
     mapping(address => Vote) public votes;
     mapping(address => Bet) public bets;
+    mapping(address => bool) public voters;
 
     modifier onlyActiveMarkets() {
         if (endDate < block.timestamp) {
@@ -50,12 +53,28 @@ contract OpinionMarket is IOpinionMarket {
         _;
     }
 
-    constructor(address _marketMaker, ISettings _initialSettings, IPayMaster _initialPayMaster) {
+    constructor(
+        address _marketMaker,
+        ISettings _initialSettings,
+        IVoterRegistry _initialVoterRegistry,
+        IPayMaster _initialPayMaster
+    ) {
         _settings = _initialSettings;
+        _voterRegistry = _initialVoterRegistry;
         _payMaster = _initialPayMaster;
         marketMaker = _marketMaker;
         endDate = block.timestamp + _settings.duration();
+
+        // VOTER SELECTION
+        uint256 voterCount = _settings.maxVoters();
+        /// @dev we allow duplicates, as registry grows this will be less likely
+        for (uint256 i = 0; i < voterCount; i++) {
+            uint256 randomIndex = uint256(keccak256(abi.encodePacked(block.timestamp, i))) % _voterRegistry.getVoterAddresses().length;
+            address voter = _voterRegistry.getVoterAddresses()[randomIndex];
+            voters[voter] = true;
+        }
     }
+
 
     //
     // COMMITTING
@@ -76,6 +95,7 @@ contract OpinionMarket is IOpinionMarket {
     /// @notice commit a vote to the market so that reveals can remain trustless
     /// @param _commitment a hashed Vote
     function commitVote(bytes32 _commitment) external onlyActiveMarkets {
+        if (!isVoter(msg.sender)) revert NotAVoter(msg.sender);
         if (votes[msg.sender].commitment != bytes32(0)) revert AlreadyCommited(msg.sender);
         if (voteCommitments > _settings.maxVoters()) revert MaxVoters(_settings.maxVoters());
 
@@ -250,6 +270,13 @@ contract OpinionMarket is IOpinionMarket {
     /// @return hash The hash of the vote
     function hashVote(VoteChoice _opinion, bytes32 _salt) public pure returns (bytes32) {
         return keccak256(abi.encode(_opinion, _salt));
+    }
+
+    /// @notice check if a user is a voter
+    /// @param _voter The user to check
+    /// @return isVoter Whether or not the user is a voter
+    function isVoter(address _voter) public view returns (bool) {
+        return voters[_voter];
     }
 
     /// @notice allow the operator to withdraw the funds from the market after 30 days

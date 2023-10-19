@@ -31,7 +31,7 @@ contract SettingsTest is Test {
     }
 
     function test_tokenUnits() public {
-        assertEq(_settings.tokenUnits(), 6);
+        assertEq(_settings.tokenUnits(), 18);
     }
 
     function test_operatorFee() public {

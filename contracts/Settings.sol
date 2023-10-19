@@ -10,8 +10,8 @@ contract Settings is ISettings {
     uint256 public duration = 1 days;
     uint256 public operatorFee = 10000; // 1%
     uint256 public marketMakerFee = 10000; // 1%
-    uint8 public tokenUnits = 6;
-    uint8 public maxVoters = 25;
+    uint8 public tokenUnits = 18;
+    uint8 public maxVoters = 50;
 
     modifier onlyOperator() {
         if (msg.sender != operator) revert Unauthorized();

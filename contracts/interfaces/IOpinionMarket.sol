@@ -21,6 +21,9 @@ interface IOpinionMarket {
         bytes32 commitment;
     }
 
+    /// @notice Thrown when trying to vote but a selected voter
+    error NotAVoter(address account);
+
     /// @notice Thrown when trying to commit again
     error AlreadyCommited(address account);
 
@@ -93,6 +96,8 @@ interface IOpinionMarket {
     function hashBet(VoteChoice _opinion, uint256 _amount, bytes32 _salt) external pure returns (bytes32);
 
     function hashVote(VoteChoice _opinion, bytes32 _salt) external pure returns (bytes32);
+
+    function isVoter(address _voter) external view returns (bool);
 
     function emergencyWithdraw() external;
 }

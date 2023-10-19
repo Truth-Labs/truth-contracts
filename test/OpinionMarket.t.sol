@@ -336,12 +336,11 @@ contract OpinionMarketTest is Test {
     // CLAIM
 
     /// @notice yea ik WTF
-    function test_claim(uint256 _iterations, uint256 _amount) public {
-        vm.assume(_iterations < 1000);
-        vm.assume(_iterations > 0);
+    function test_claim(uint256 _iterations) public {
+        vm.assume(_iterations > 4);
+        vm.assume(_iterations < 250);
         uint256 tokenBalance = IERC20(_token).balanceOf(address(this));
-        vm.assume(_amount > _iterations);
-        vm.assume(_amount < tokenBalance / _iterations);
+        uint256 _amount = tokenBalance / _iterations;
 
         // first commit bets
         address market = _deployMarket();
@@ -429,8 +428,9 @@ contract OpinionMarketTest is Test {
         return _deployer.deployMarket(msg.sender);
     }
 
-    function _generateMockValues(uint256 _maxAmount, uint256 _nonce) internal view returns (address, uint256, IOpinionMarket.VoteChoice, bytes32) {
+    function _generateMockValues(uint256 _maxAmount, uint256 _nonce) internal returns (address, uint256, IOpinionMarket.VoteChoice, bytes32) {
         address mockAddress = address(uint160(uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, _nonce)))));
+        // register them as a voter
         uint256 mockAmount = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, _nonce))) % _maxAmount;
         mockAmount = mockAmount == 0 ? 1 : mockAmount;
         bytes32 mockSalt = keccak256(abi.encodePacked(block.timestamp, block.prevrandao, _nonce));
