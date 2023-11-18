@@ -6,98 +6,57 @@ import "./ISettings.sol";
 
 interface IOpinionMarket {
     enum VoteChoice {
-        No,
-        Yes
+        Yes,
+        No
+    }
+
+    struct MarketState {
+        uint256 yesVotes;
+        uint256 noVotes;
+        uint256 yesVolume;
+        uint256 noVolume;
+        bool isClosed;
     }
 
     struct Bet {
-        VoteChoice opinion;
+        address user;
+        uint256 marketId;
         uint256 amount;
         bytes32 commitment;
-    }
-
-    struct Vote {
         VoteChoice opinion;
-        bytes32 commitment;
     }
 
-    /// @notice Thrown when trying to vote but a selected voter
-    error NotAVoter(address account);
-
-    /// @notice Thrown when trying to commit again
-    error AlreadyCommited(address account);
-
-    /// @notice Thrown when attempting to commit a bet with a 0 amount
-    error InvalidAmount(address account);
-
-    /// @notice Thrown when max voters is reached
-    error MaxVoters(uint8 maxVoters);
-
-    /// @notice Thrown when attempting to reuse a nullifier
-    error InvalidNullifier();
-
-    /// @notice Thrown when attempting to reveal a vote that has not been committed, already revealed, or resolved market
-    error FailedTransfer(address account, uint256 amount);
-
-    /// @notice Thrown when attempting to claim a bet that does not exist, or has already been claimed, or market is not resolved
-    error AlreadyClaimed(address account);
-
-    /// @notice Thrown when a commitment does not match the hash of the bet
-    error InvalidCommitment(address account, bytes32 commitment);
-
-    /// @notice Thrown when an unauthorized user attempts an authorized action
     error Unauthorized();
+    error NoOpenMarket(uint256 endDate);
+    error NoInactiveMarket(uint256 endDate);
+    error NotClosed(uint256 marketId);
+    error InvalidAmount(address bettor);
+    error AlreadyCommited(address bettor);
+    error InvalidReveal(address bettor);
+    error FailedTransfer(address bettor);
 
-    /// @notice Thrown when attempting an action that can only be performed at the end of a market
-    error MarketIsActive(uint256 closeDate);
+    event BetCommited(address indexed bettor, uint256 amount, uint256 marketId);
+    event BetRevealed(address indexed bettor, VoteChoice choice, uint256 marketId);
+    event BetClaimed(address indexed bettor, uint256 amount, uint256 marketId);
+    event FeesClaimed(address indexed operator, uint256 amount);
 
-    /// @notice Thrown when attempting an action that can only be performed before market is closed
-    error MarketIsInactive(uint256 closedDate);
+    function start() external;
 
-    /// @notice Thrown when attempting an action that can only be performed after market is closed
-    error MarketIsNotClosed();
-
-    event BetCommitted(address indexed user,  uint256 amount, bytes32 commitment);
-    event VoteCommitted(address indexed voter, bytes32 commitment);
-    event VoteRevealed(address indexed voter, VoteChoice opinion);
-    event BetRevealed(address indexed user, VoteChoice opinion);
-    event BetClaimed(address indexed user, uint256 payout);
-    event VoteClaimed(address indexed voter, uint256 payout);
-    event FeesClaimed(address indexed marketMaker, address indexed operator, uint256 amount);
-    
     function commitBet(bytes32 _commitment, uint256 _amount) external;
 
-    function commitVote(bytes32 _commitment) external;
-
-    function revealBet(address _user, VoteChoice _opinion, uint256 _amount, bytes32 _salt) external;
-
-    function revealVote(address _voter, VoteChoice _opinion, bytes32 _salt) external;
+    function revealBet(address _bettor, VoteChoice _opinion, uint256 _amount, bytes32 _salt) external;
 
     function closeMarket() external;
 
-    function claimBet() external;
-
-    function claimVote() external;
-
-    function claimFees() external;
-
-    function calculateTotalFeeAmount(uint256 _amount) external view returns (uint256);
+    function claimBet(uint256 _marketId) external;
 
     function calculatePayout(
-        uint256 _amount,
-        uint256 _totalVolume,
-        uint256 _winningVolume
-    ) external pure returns (uint256);
-
-    function calculateBettorPayout(address _user) external view returns (uint256);
-
-    function calculateVoterPayout(address _voter) external view returns (uint256);
+        uint256 _betAmount,
+        uint256 _totalPoolAmount,
+        uint256 _winningPoolAmount
+    ) external view returns (uint256);
 
     function hashBet(VoteChoice _opinion, uint256 _amount, bytes32 _salt) external pure returns (bytes32);
 
-    function hashVote(VoteChoice _opinion, bytes32 _salt) external pure returns (bytes32);
-
-    function isVoter(address _voter) external view returns (bool);
-
-    function emergencyWithdraw() external;
+    function getBetId(address _bettor, uint256 _marketId) external pure returns (uint256);
 }

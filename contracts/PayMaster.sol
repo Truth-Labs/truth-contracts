@@ -7,7 +7,7 @@ import "./interfaces/IPayMaster.sol";
 
 contract PayMaster is IPayMaster {
     address private _owner;
-    mapping (address => bool) private _authorizedSpenders;
+    mapping(address => bool) private _authorizedSpenders;
 
     modifier onlyOwner() {
         if (msg.sender != _owner) revert NotAuthorized(msg.sender);

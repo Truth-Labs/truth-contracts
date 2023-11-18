@@ -5,7 +5,6 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/IOpinionMarket.sol";
 import "./interfaces/ISettings.sol";
-import "./interfaces/IVoterRegistry.sol";
 import "./interfaces/IPayMaster.sol";
 import "./libraries/PercentageMath.sol";
 
@@ -13,201 +12,135 @@ contract OpinionMarket is IOpinionMarket {
     using PercentageMath for uint256;
 
     ISettings private _settings;
-    IVoterRegistry private _voterRegistry;
     IPayMaster private _payMaster;
-    address public marketMaker;
-    uint8 public voteCommitments;
-    uint256 public yesVolume;
-    uint256 public noVolume;
-    uint256 public yesVotes;
-    uint256 public noVotes;
     uint256 public endDate;
-    bool public closed = false;
-    bool public makerAndOperatorFeesClaimed = false;
-
-    mapping(address => Vote) public votes;
-    mapping(address => Bet) public bets;
-    mapping(address => bool) public voters;
-
-    modifier onlyActiveMarkets() {
-        if (endDate < block.timestamp) {
-            revert MarketIsInactive(endDate);
-        }
-        _;
-    }
-
-    modifier onlyInactiveMarkets() {
-        if (endDate > block.timestamp) {
-            revert MarketIsActive(endDate);
-        }
-        _;
-    }
-
-    modifier onlyClosedMarkets() {
-        if (!closed) revert MarketIsNotClosed();
-        _;
-    }
+    uint256 public marketId;
+    mapping(address => uint256[]) public userMarkets;
+    mapping(uint256 => MarketState) public marketStates;
+    mapping(uint256 => Bet) public bets;
 
     modifier onlyOperator() {
         if (msg.sender != _settings.operator()) revert Unauthorized();
         _;
     }
 
-    constructor(
-        address _marketMaker,
-        ISettings _initialSettings,
-        IVoterRegistry _initialVoterRegistry,
-        IPayMaster _initialPayMaster
-    ) {
-        _settings = _initialSettings;
-        _voterRegistry = _initialVoterRegistry;
-        _payMaster = _initialPayMaster;
-        marketMaker = _marketMaker;
-        endDate = block.timestamp + _settings.duration();
-
-        // VOTER SELECTION
-        uint256 voterCount = _settings.maxVoters();
-        /// @dev we allow duplicates, as registry grows this will be less likely
-        for (uint256 i = 0; i < voterCount; i++) {
-            uint256 randomIndex = uint256(keccak256(abi.encodePacked(block.timestamp, i))) % _voterRegistry.getVoterAddresses().length;
-            address voter = _voterRegistry.getVoterAddresses()[randomIndex];
-            voters[voter] = true;
-        }
+    modifier onlyActiveMarkets() {
+        if (endDate < block.timestamp) revert NoOpenMarket(endDate);
+        _;
     }
 
+    modifier onlyInactiveMarkets() {
+        if (endDate > block.timestamp) revert NoInactiveMarket(endDate);
+        _;
+    }
 
-    //
-    // COMMITTING
-    //
+    modifier onlyClosedMarkets(uint256 _marketId) {
+        if (!marketStates[_marketId].isClosed) revert NotClosed(endDate);
+        _;
+    }
+
+    constructor(ISettings _initialSettings, IPayMaster _initialPayMaster) {
+        _settings = _initialSettings;
+        _payMaster = _initialPayMaster;
+    }
+
+    function start() external onlyOperator {
+        endDate = block.timestamp + _settings.duration();
+        marketId = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao)));
+
+        marketStates[marketId] = MarketState(0, 0, 0, 0, false);
+    }
 
     /// @notice commit a bet to the market so that reveals can remain trustless
     /// @param _commitment a hashed Bet
     function commitBet(bytes32 _commitment, uint256 _amount) external onlyActiveMarkets {
+        uint256 id = getBetId(msg.sender, marketId);
         if (_amount == 0) revert InvalidAmount(msg.sender);
-        if (bets[msg.sender].commitment != bytes32(0)) revert AlreadyCommited(msg.sender);
+        if (bets[id].commitment != bytes32(0)) revert AlreadyCommited(msg.sender);
         _payMaster.collect(_settings.token(), msg.sender, _amount);
 
-        bets[msg.sender] = Bet(VoteChoice.Yes, _amount, _commitment);
+        bets[id] = Bet(msg.sender, marketId, _amount, _commitment, VoteChoice.Yes);
+        userMarkets[msg.sender].push(marketId);
 
-        emit BetCommitted(msg.sender, _amount, _commitment);
+        emit BetCommited(msg.sender, _amount, marketId);
     }
-
-    /// @notice commit a vote to the market so that reveals can remain trustless
-    /// @param _commitment a hashed Vote
-    function commitVote(bytes32 _commitment) external onlyActiveMarkets {
-        if (!isVoter(msg.sender)) revert NotAVoter(msg.sender);
-        if (votes[msg.sender].commitment != bytes32(0)) revert AlreadyCommited(msg.sender);
-        if (voteCommitments > _settings.maxVoters()) revert MaxVoters(_settings.maxVoters());
-
-        voteCommitments++;
-        votes[msg.sender] = Vote(VoteChoice.Yes, _commitment);
-
-        emit VoteCommitted(msg.sender, _commitment);
-    }
-
-    //
-    // REVEALING
-    //
 
     /// @notice at the conclusion of a market the operator decrypts the timelocked commitments and submits
     /// @param _bettor The user who placed the bet
     /// @param _opinion The opinion that is being bet on
     /// @param _amount The amount of the bet
     /// @param _salt The salt used to hash the bet
-    function revealBet(address _bettor, VoteChoice _opinion, uint256 _amount, bytes32 _salt) external onlyInactiveMarkets onlyOperator {
-        if (hashBet(_opinion, _amount, _salt) != bets[_bettor].commitment) revert InvalidCommitment(_bettor, bets[_bettor].commitment);
+    function revealBet(
+        address _bettor,
+        VoteChoice _opinion,
+        uint256 _amount,
+        bytes32 _salt
+    ) external onlyInactiveMarkets onlyOperator {
+        uint256 id = getBetId(_bettor, marketId);
+        if (hashBet(_opinion, _amount, _salt) != bets[id].commitment) revert InvalidReveal(_bettor);
 
-        bets[_bettor].opinion = _opinion;
+        bets[id].opinion = _opinion;
         if (_opinion == VoteChoice.Yes) {
-            yesVolume += _amount;
+            marketStates[marketId].yesVolume += _amount;
+            marketStates[marketId].yesVotes += 1;
         } else {
-            noVolume += _amount;
+            marketStates[marketId].noVolume += _amount;
+            marketStates[marketId].noVotes += 1;
         }
 
-        emit BetRevealed(_bettor, _opinion);
+        emit BetRevealed(_bettor, _opinion, marketId);
     }
-
-    /// @notice reveal a vote once the timelock reaches expiration
-    /// @param _voter The voter who placed the vote
-    /// @param _opinion The opinion that is being voted on
-    /// @param _salt The salt used to hash the vote
-    function revealVote(address _voter, VoteChoice _opinion, bytes32 _salt) external onlyOperator onlyInactiveMarkets {
-        if (hashVote(_opinion, _salt) != votes[_voter].commitment) revert InvalidCommitment(_voter, votes[_voter].commitment);
-
-        votes[_voter].opinion = _opinion;
-        if (VoteChoice.Yes == _opinion) {
-            yesVotes++;
-        } else {
-            noVotes++;
-        }
-
-        emit VoteRevealed(_voter, _opinion);
-    }
-
-    //
-    // CLAIMING
-    //
 
     /// @notice close the market after operator has revealed votes and bets
     function closeMarket() external onlyInactiveMarkets onlyOperator {
-        closed = true;
+        marketStates[marketId].isClosed = true;
+        _claimFees();
     }
 
     /// @notice allow winning betters to claim their winnings
-    function claimBet() external onlyClosedMarkets {
-        if (bets[msg.sender].commitment == bytes32(0)) revert AlreadyClaimed(msg.sender);
+    function claimBet(uint256 _marketId) external onlyClosedMarkets(_marketId) {
+        MarketState memory marketState = marketStates[_marketId];
+        Bet memory bet = bets[getBetId(msg.sender, _marketId)];
+        uint256 payout = 0;
 
-        uint256 payout = calculateBettorPayout(msg.sender);
-        delete bets[msg.sender];
-        if (!IERC20(_settings.token()).transfer(msg.sender, payout)) {
-            revert FailedTransfer(msg.sender, payout);
+        VoteChoice winningChoice = marketState.yesVotes > marketState.noVotes ? VoteChoice.Yes : VoteChoice.No;
+        if (marketState.yesVotes == marketState.noVotes) {
+            payout = bet.amount;
+        } else if (bet.opinion == winningChoice) {
+            payout = calculatePayout(
+                bet.amount,
+                marketState.yesVolume + marketState.noVolume,
+                winningChoice == VoteChoice.Yes ? marketState.yesVolume : marketState.noVolume
+            );
         }
 
-        emit BetClaimed(msg.sender, payout);
-    }
-
-    /// @notice allow voters who voted correctly claim their winnings
-    function claimVote() external onlyClosedMarkets {
-        if (votes[msg.sender].commitment == bytes32(0)) revert AlreadyClaimed(msg.sender);
-
-        uint256 payout = calculateVoterPayout(msg.sender);
-        delete votes[msg.sender];
+        delete bets[getBetId(msg.sender, _marketId)];
         if (!IERC20(_settings.token()).transfer(msg.sender, payout)) {
-            revert FailedTransfer(msg.sender, payout);
+            revert FailedTransfer(msg.sender);
         }
 
-        emit VoteClaimed(msg.sender, payout);
+        emit BetClaimed(msg.sender, payout, _marketId);
     }
 
     /// @notice claim the fees from the market and send to the operator and the market maker
-    function claimFees() external onlyClosedMarkets {
-        if (makerAndOperatorFeesClaimed) revert AlreadyClaimed(msg.sender);
+    function _claimFees() internal onlyOperator {
+        MarketState memory marketState = marketStates[marketId];
+        if (marketState.noVotes == marketState.yesVotes) return;
 
-        uint256 losingPoolVolume = yesVotes > noVotes ? noVolume : yesVolume;
+        uint256 losingPoolVolume = marketState.yesVotes > marketState.noVotes
+            ? marketState.noVolume
+            : marketState.yesVolume;
         uint256 operatorFee = losingPoolVolume.multiplyByPercentage(_settings.operatorFee(), _settings.tokenUnits());
-        uint256 marketMakerFee = losingPoolVolume.multiplyByPercentage(
-            _settings.marketMakerFee(),
-            _settings.tokenUnits()
-        );
-        makerAndOperatorFeesClaimed = true;
-        bool operatorSuccess = IERC20(_settings.token()).transfer(_settings.operator(), operatorFee);
-        bool marketMakerSuccess = IERC20(_settings.token()).transfer(marketMaker, marketMakerFee);
-        if (!operatorSuccess || !marketMakerSuccess) revert FailedTransfer(msg.sender, operatorFee + marketMakerFee);
 
-        emit FeesClaimed(marketMaker, _settings.operator(), operatorFee + marketMakerFee);
-    }
+        if (marketState.yesVotes > marketState.noVotes) {
+            marketState.noVolume -= operatorFee;
+        } else {
+            marketState.yesVolume -= operatorFee;
+        }
 
-    //
-    // HELPERS
-    //
+        if (!IERC20(_settings.token()).transfer(_settings.operator(), operatorFee)) revert FailedTransfer(msg.sender);
 
-    /// @notice calculate the total fee amount for a given amount
-    /// @param _amount The amount to calculate the fee for
-    /// @return totalFee The total fee amount
-    function calculateTotalFeeAmount(uint256 _amount) public view returns (uint256) {
-        return
-            _amount.multiplyByPercentage(_settings.operatorFee(), _settings.tokenUnits()) +
-            _amount.multiplyByPercentage(_settings.marketMakerFee(), _settings.tokenUnits());
+        emit FeesClaimed(_settings.operator(), operatorFee);
     }
 
     /// @notice calculate the payout for a bet and deducts fees for market makers and operators
@@ -223,38 +156,6 @@ contract OpinionMarket is IOpinionMarket {
         return (_yourBetAmount * _totalPoolAmount) / _poolSizeForWinningSide;
     }
 
-    /// @notice calculate the payout for a bettor
-    /// @param _user The user who placed the bet
-    function calculateBettorPayout(address _user) public view returns (uint256) {
-        if (yesVotes == noVotes) return bets[_user].amount;
-
-        VoteChoice consensus = yesVotes > noVotes ? VoteChoice.Yes : VoteChoice.No;
-        if (bets[_user].opinion == consensus) {
-            uint256 losingPoolVolume = yesVotes > noVotes ? noVolume : yesVolume;
-            uint256 totalFees = calculateTotalFeeAmount(losingPoolVolume);
-            return
-                calculatePayout(
-                    bets[_user].amount,
-                    yesVolume + noVolume - totalFees,
-                    consensus == VoteChoice.Yes ? yesVolume : noVolume
-                );
-        }
-
-        return 0;
-    }
-
-    /// @notice calculate the payout for a voter
-    /// @param _user The user who placed the vote
-    /// @return payout The payout amount
-    function calculateVoterPayout(address _user) public view returns (uint256) {
-        VoteChoice consensus = yesVotes > noVotes ? VoteChoice.Yes : VoteChoice.No;
-        if (votes[_user].opinion == consensus) {
-            return _settings.bounty() / (consensus == VoteChoice.Yes ? yesVotes : noVotes);
-        }
-
-        return 0;
-    }
-
     /// @notice hash a bet
     /// @param _opinion The opinion that is being bet on
     /// @param _amount The amount of the bet
@@ -264,25 +165,11 @@ contract OpinionMarket is IOpinionMarket {
         return keccak256(abi.encode(_opinion, _amount, _salt));
     }
 
-    /// @notice hash a vote
-    /// @param _opinion The opinion that is being voted on
-    /// @param _salt The salt used to hash the vote
-    /// @return hash The hash of the vote
-    function hashVote(VoteChoice _opinion, bytes32 _salt) public pure returns (bytes32) {
-        return keccak256(abi.encode(_opinion, _salt));
-    }
-
-    /// @notice check if a user is a voter
-    /// @param _voter The user to check
-    /// @return isVoter Whether or not the user is a voter
-    function isVoter(address _voter) public view returns (bool) {
-        return voters[_voter];
-    }
-
-    /// @notice allow the operator to withdraw the funds from the market after 30 days
-    function emergencyWithdraw() external onlyOperator {
-        if (block.timestamp < endDate + 30 days) {
-            IERC20(_settings.token()).transfer(_settings.operator(), IERC20(_settings.token()).balanceOf(address(this)));
-        }
+    /// @notice get the id of a bet
+    /// @param _bettor The user who placed the bet
+    /// @param _marketId The id of the market
+    /// @return id The id of the bet
+    function getBetId(address _bettor, uint256 _marketId) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(_bettor, _marketId)));
     }
 }

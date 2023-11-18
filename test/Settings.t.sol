@@ -22,10 +22,6 @@ contract SettingsTest is Test {
         assertEq(_settings.operator(), address(this));
     }
 
-    function test_bounty() public {
-        assertEq(_settings.bounty(), 50000000);
-    }
-
     function test_duration() public {
         assertEq(_settings.duration(), 1 days);
     }
@@ -38,14 +34,6 @@ contract SettingsTest is Test {
         assertEq(_settings.operatorFee(), 10000);
     }
 
-    function test_marketMakerFee() public {
-        assertEq(_settings.marketMakerFee(), 10000);
-    }
-
-    function test_maxVoters() public {
-        assertEq(_settings.maxVoters(), 25);
-    }
-
     function test_setToken() public {
         _settings.setToken(address(0x1));
         assertEq(_settings.token(), address(0x1));
@@ -54,11 +42,6 @@ contract SettingsTest is Test {
     function test_setOperator() public {
         _settings.setOperator(address(0x3));
         assertEq(_settings.operator(), address(0x3));
-    }
-
-    function test_setBounty() public {
-        _settings.setBounty(25500001);
-        assertEq(_settings.bounty(), 25500001);
     }
 
     function test_setDuration() public {
@@ -76,16 +59,6 @@ contract SettingsTest is Test {
         assertEq(_settings.operatorFee(), 10001);
     }
 
-    function test_setMarketMakerFee() public {
-        _settings.setMarketMakerFee(10001);
-        assertEq(_settings.marketMakerFee(), 10001);
-    }
-
-    function test_setMaxVoters() public {
-        _settings.setMaxVoters(26);
-        assertEq(_settings.maxVoters(), 26);
-    }
-
     function testRevert_setTokenNotOperator(address _user) public {
         vm.assume(!(_user == address(this)));
 
@@ -100,14 +73,6 @@ contract SettingsTest is Test {
         vm.prank(address(0));
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setOperator(address(0x3));
-    }
-
-    function testRevert_setBountyNotOperator(address _user) public {
-        vm.assume(!(_user == address(this)));
-
-        vm.prank(address(0));
-        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
-        _settings.setBounty(25500001);
     }
 
     function testRevert_setDurationNotOperator(address _user) public {
@@ -132,21 +97,5 @@ contract SettingsTest is Test {
         vm.prank(address(0));
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setOperatorFee(10001);
-    }
-
-    function testRevert_setMarketMakerFeeNotOperator(address _user) public {
-        vm.assume(!(_user == address(this)));
-
-        vm.prank(address(0));
-        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
-        _settings.setMarketMakerFee(10001);
-    }
-
-    function testRevert_setMaxVotersNotOperator(address _user) public {
-        vm.assume(!(_user == address(this)));
-
-        vm.prank(address(0));
-        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
-        _settings.setMaxVoters(26);
     }
 }
