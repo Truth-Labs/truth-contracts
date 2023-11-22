@@ -23,7 +23,7 @@ contract SettingsTest is Test {
     }
 
     function test_duration() public {
-        assertEq(_settings.duration(), 1 days);
+        assertEq(_settings.duration(), 5 minutes);
     }
 
     function test_tokenUnits() public {
@@ -32,6 +32,10 @@ contract SettingsTest is Test {
 
     function test_operatorFee() public {
         assertEq(_settings.operatorFee(), 10000);
+    }
+
+    function test_minimumVotes() public {
+        assertEq(_settings.minimumVotes(), 15);
     }
 
     function test_setToken() public {
@@ -59,10 +63,15 @@ contract SettingsTest is Test {
         assertEq(_settings.operatorFee(), 10001);
     }
 
+    function test_setMinimumVotes() public {
+        _settings.setMinimumVotes(16);
+        assertEq(_settings.minimumVotes(), 16);
+    }
+
     function testRevert_setTokenNotOperator(address _user) public {
         vm.assume(!(_user == address(this)));
 
-        vm.prank(address(0));
+        vm.prank(_user);
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setToken(address(0x1));
     }
@@ -70,7 +79,7 @@ contract SettingsTest is Test {
     function testRevert_setOperatorNotOperator(address _user) public {
         vm.assume(!(_user == address(this)));
 
-        vm.prank(address(0));
+        vm.prank(_user);
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setOperator(address(0x3));
     }
@@ -78,7 +87,7 @@ contract SettingsTest is Test {
     function testRevert_setDurationNotOperator(address _user) public {
         vm.assume(!(_user == address(this)));
 
-        vm.prank(address(0));
+        vm.prank(_user);
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setDuration(4 days);
     }
@@ -86,7 +95,7 @@ contract SettingsTest is Test {
     function testRevert_setTokenUnitsNotOperator(address _user) public {
         vm.assume(!(_user == address(this)));
 
-        vm.prank(address(0));
+        vm.prank(_user);
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setTokenUnits(7);
     }
@@ -94,8 +103,16 @@ contract SettingsTest is Test {
     function testRevert_setOperatorFeeNotOperator(address _user) public {
         vm.assume(!(_user == address(this)));
 
-        vm.prank(address(0));
+        vm.prank(_user);
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setOperatorFee(10001);
+    }
+
+    function testRevert_setMinimumVotesNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
+        vm.prank(_user);
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
+        _settings.setMinimumVotes(16);
     }
 }

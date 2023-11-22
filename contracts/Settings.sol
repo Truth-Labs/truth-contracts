@@ -9,6 +9,7 @@ contract Settings is ISettings {
     uint256 public duration = 5 minutes;
     uint256 public operatorFee = 10000; // 1%
     uint8 public tokenUnits = 18;
+    uint8 public minimumVotes = 15;
 
     modifier onlyOperator() {
         if (msg.sender != operator) revert Unauthorized();
@@ -43,5 +44,10 @@ contract Settings is ISettings {
     function setOperatorFee(uint256 _operatorFee) external onlyOperator {
         operatorFee = _operatorFee;
         emit OperatorFeeChanged(_operatorFee);
+    }
+
+    function setMinimumVotes(uint8 _minimumVotes) external onlyOperator {
+        minimumVotes = _minimumVotes;
+        emit MinimumVotesChanged(_minimumVotes);
     }
 }

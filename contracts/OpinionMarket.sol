@@ -15,6 +15,7 @@ contract OpinionMarket is IOpinionMarket {
     IPayMaster private _payMaster;
     uint256 public endDate;
     uint256 public marketId;
+    uint256 public votes;
     mapping(address => uint256[]) public userMarkets;
     mapping(uint256 => MarketState) public marketStates;
     mapping(uint256 => Bet) public bets;
@@ -25,26 +26,32 @@ contract OpinionMarket is IOpinionMarket {
     }
 
     modifier onlyActiveMarkets() {
-        if (endDate < block.timestamp) revert NoOpenMarket(endDate);
+        if (endDate < block.timestamp && votes >= _settings.minimumVotes()) revert NoOpenMarket(endDate);
         _;
     }
 
     modifier onlyInactiveMarkets() {
-        if (endDate > block.timestamp) revert NoInactiveMarket(endDate);
+        if (endDate > block.timestamp || votes < _settings.minimumVotes()) revert NoInactiveMarket(endDate);
         _;
     }
 
     modifier onlyClosedMarkets(uint256 _marketId) {
-        if (!marketStates[_marketId].isClosed) revert NotClosed(endDate);
+        if (!marketStates[_marketId].isClosed) revert NotClosed(_marketId);
         _;
     }
 
     constructor(ISettings _initialSettings, IPayMaster _initialPayMaster) {
         _settings = _initialSettings;
         _payMaster = _initialPayMaster;
+
+        /// @dev simplify modifiers by setting votes to non null
+        votes = _settings.minimumVotes();
     }
 
     function start() external onlyOperator {
+        if (marketId != 0 && !marketStates[marketId].isClosed) revert NotClosed(marketId);
+
+        votes = 0;
         endDate = block.timestamp + _settings.duration();
         marketId = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao)));
 
@@ -60,6 +67,7 @@ contract OpinionMarket is IOpinionMarket {
         _payMaster.collect(_settings.token(), msg.sender, _amount);
 
         bets[id] = Bet(msg.sender, marketId, _amount, _commitment, VoteChoice.Yes);
+        votes++;
         userMarkets[msg.sender].push(marketId);
 
         emit BetCommited(msg.sender, _amount, marketId);
@@ -122,7 +130,7 @@ contract OpinionMarket is IOpinionMarket {
         emit BetClaimed(msg.sender, payout, _marketId);
     }
 
-    /// @notice claim the fees from the market and send to the operator and the market maker
+    /// @notice claim the fees from the market and send to the operator
     function _claimFees() internal onlyOperator {
         MarketState memory marketState = marketStates[marketId];
         if (marketState.noVotes == marketState.yesVotes) return;
