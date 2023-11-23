@@ -11,6 +11,7 @@ interface IOpinionMarket {
     }
 
     struct MarketState {
+        uint256 commitments;
         uint256 yesVotes;
         uint256 noVotes;
         uint256 yesVolume;
@@ -27,8 +28,8 @@ interface IOpinionMarket {
     }
 
     error Unauthorized();
-    error NoOpenMarket(uint256 endDate);
-    error NoInactiveMarket(uint256 endDate);
+    error NotActive(uint256 endDate);
+    error NotInactive(uint256 endDate);
     error NotClosed(uint256 marketId);
     error InvalidAmount(address bettor);
     error AlreadyCommited(address bettor);

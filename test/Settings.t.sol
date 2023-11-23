@@ -38,6 +38,10 @@ contract SettingsTest is Test {
         assertEq(_settings.minimumVotes(), 15);
     }
 
+    function test_feePrecision() public {
+        assertEq(_settings.feePrecision(), 6);
+    }
+
     function test_setToken() public {
         _settings.setToken(address(0x1));
         assertEq(_settings.token(), address(0x1));
@@ -66,6 +70,11 @@ contract SettingsTest is Test {
     function test_setMinimumVotes() public {
         _settings.setMinimumVotes(16);
         assertEq(_settings.minimumVotes(), 16);
+    }
+
+    function test_setFeePrecision() public {
+        _settings.setFeePrecision(7);
+        assertEq(_settings.feePrecision(), 7);
     }
 
     function testRevert_setTokenNotOperator(address _user) public {
@@ -114,5 +123,13 @@ contract SettingsTest is Test {
         vm.prank(_user);
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setMinimumVotes(16);
+    }
+
+    function testRevert_setFeePrecisionNotOperator(address _user) public {
+        vm.assume(!(_user == address(this)));
+
+        vm.prank(_user);
+        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
+        _settings.setFeePrecision(7);
     }
 }

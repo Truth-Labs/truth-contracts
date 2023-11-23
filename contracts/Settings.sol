@@ -9,6 +9,7 @@ contract Settings is ISettings {
     uint256 public duration = 5 minutes;
     uint256 public operatorFee = 10000; // 1%
     uint8 public tokenUnits = 18;
+    uint8 public feePrecision = 6;
     uint8 public minimumVotes = 15;
 
     modifier onlyOperator() {
@@ -39,6 +40,11 @@ contract Settings is ISettings {
     function setTokenUnits(uint8 _tokenUnits) external onlyOperator {
         tokenUnits = _tokenUnits;
         emit TokenUnitsChanged(_tokenUnits);
+    }
+
+    function setFeePrecision(uint8 _feePrecision) external onlyOperator {
+        feePrecision = _feePrecision;
+        emit FeePrecisionChanged(_feePrecision);
     }
 
     function setOperatorFee(uint256 _operatorFee) external onlyOperator {
