@@ -16,6 +16,8 @@ interface IOpinionMarket {
         uint256 noVotes;
         uint256 yesVolume;
         uint256 noVolume;
+        uint256 rakebackFee;
+        uint256 closedAt;
         bool isClosed;
     }
 
@@ -34,7 +36,9 @@ interface IOpinionMarket {
     error InvalidAmount(address bettor);
     error AlreadyCommited(address bettor);
     error InvalidReveal(address bettor);
+    error AlreadyClaimed(address bettor);
     error FailedTransfer(address bettor);
+    error TooEarlyRakebackClaim(uint256 validClaimDate);
 
     event BetCommited(address indexed bettor, uint256 amount, uint256 marketId);
     event BetRevealed(address indexed bettor, VoteChoice choice, uint256 marketId);
@@ -50,6 +54,10 @@ interface IOpinionMarket {
     function closeMarket() external;
 
     function claimBet(uint256 _marketId) external;
+
+    function claimAllBets(uint256[] calldata _marketIds) external;
+
+    function claimRakeback(uint256 _marketId) external;
 
     function calculatePayout(
         uint256 _betAmount,

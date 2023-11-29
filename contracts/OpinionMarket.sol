@@ -6,6 +6,7 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IOpinionMarket.sol";
 import "./interfaces/ISettings.sol";
 import "./interfaces/IPayMaster.sol";
+import "./interfaces/IReferralProgram.sol";
 import "./libraries/PercentageMath.sol";
 
 contract OpinionMarket is IOpinionMarket {
@@ -13,6 +14,7 @@ contract OpinionMarket is IOpinionMarket {
 
     ISettings private _settings;
     IPayMaster private _payMaster;
+    IReferralProgram private _referralProgram;
     uint256 public endDate;
     uint256 public marketId;
     mapping(uint256 => MarketState) public marketStates;
@@ -41,18 +43,21 @@ contract OpinionMarket is IOpinionMarket {
         _;
     }
 
-    constructor(ISettings _initialSettings, IPayMaster _initialPayMaster) {
+    constructor(ISettings _initialSettings, IPayMaster _initialPayMaster, IReferralProgram _initialReferralProgram) {
         _settings = _initialSettings;
         _payMaster = _initialPayMaster;
+        _referralProgram = _initialReferralProgram;
     }
 
+    /// @notice start a new market
+    /// @dev can only be called by the operator when the previous market is closed
     function start() external onlyOperator {
         if (marketId != 0 && !marketStates[marketId].isClosed) revert NotClosed(marketId);
 
         endDate = block.timestamp + _settings.duration();
         marketId = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao)));
 
-        marketStates[marketId] = MarketState(0, 0, 0, 0, 0, false);
+        marketStates[marketId] = MarketState(0, 0, 0, 0, 0, 0, type(uint256).max, false);
     }
 
     /// @notice commit a bet to the market so that reveals can remain trustless
@@ -86,10 +91,14 @@ contract OpinionMarket is IOpinionMarket {
         bets[id].opinion = _opinion;
         if (_opinion == VoteChoice.Yes) {
             marketStates[marketId].yesVolume += _amount;
-            marketStates[marketId].yesVotes += 1;
+            if (_referralProgram.getReferralStatus(_bettor).isVerified) {
+                marketStates[marketId].yesVotes += 1;
+            }
         } else {
             marketStates[marketId].noVolume += _amount;
-            marketStates[marketId].noVotes += 1;
+            if (_referralProgram.getReferralStatus(_bettor).isVerified) {
+                marketStates[marketId].noVotes += 1;
+            }
         }
 
         emit BetRevealed(_bettor, _opinion, marketId);
@@ -98,15 +107,17 @@ contract OpinionMarket is IOpinionMarket {
     /// @notice close the market after operator has revealed votes and bets
     function closeMarket() external onlyInactiveMarkets onlyOperator {
         marketStates[marketId].isClosed = true;
+        marketStates[marketId].closedAt = block.timestamp;
         _claimFees();
     }
 
     /// @notice allow winning betters to claim their winnings
     function claimBet(uint256 _marketId) external onlyClosedMarkets(_marketId) {
-        MarketState memory marketState = marketStates[_marketId];
+        MarketState storage marketState = marketStates[_marketId];
         Bet memory bet = bets[getBetId(msg.sender, _marketId)];
-        uint256 payout = 0;
+        if (bet.amount == 0) revert AlreadyClaimed(msg.sender);
 
+        uint256 payout = 0;
         VoteChoice winningChoice = marketState.yesVotes > marketState.noVotes ? VoteChoice.Yes : VoteChoice.No;
         if (marketState.yesVotes == marketState.noVotes) {
             payout = bet.amount;
@@ -116,6 +127,9 @@ contract OpinionMarket is IOpinionMarket {
                 marketState.yesVolume + marketState.noVolume,
                 winningChoice == VoteChoice.Yes ? marketState.yesVolume : marketState.noVolume
             );
+        } else {
+            payout = bet.amount.multiplyByPercentage(_settings.rakebackFee(), _settings.feePrecision());
+            marketState.rakebackFee -= payout;
         }
 
         delete bets[getBetId(msg.sender, _marketId)];
@@ -124,6 +138,12 @@ contract OpinionMarket is IOpinionMarket {
         }
 
         emit BetClaimed(msg.sender, payout, _marketId);
+    }
+
+    function claimAllBets(uint256[] calldata _marketIds) external {
+        for (uint256 i = 0; i < _marketIds.length; i++) {
+            this.claimBet(_marketIds[i]);
+        }
     }
 
     /// @notice claim the fees from the market and send to the operator
@@ -135,11 +155,13 @@ contract OpinionMarket is IOpinionMarket {
             ? marketState.noVolume
             : marketState.yesVolume;
         uint256 operatorFee = losingPoolVolume.multiplyByPercentage(_settings.operatorFee(), _settings.feePrecision());
+        uint256 rakebackFee = losingPoolVolume.multiplyByPercentage(_settings.rakebackFee(), _settings.feePrecision());
+        marketState.rakebackFee = rakebackFee;
 
         if (marketState.yesVotes > marketState.noVotes) {
-            marketState.noVolume -= operatorFee;
+            marketState.noVolume -= (operatorFee + rakebackFee);
         } else {
-            marketState.yesVolume -= operatorFee;
+            marketState.yesVolume -= (operatorFee + rakebackFee);
         }
 
         if (!IERC20(_settings.token()).transfer(_settings.operator(), operatorFee)) revert FailedTransfer(msg.sender);
@@ -147,17 +169,30 @@ contract OpinionMarket is IOpinionMarket {
         emit FeesClaimed(_settings.operator(), operatorFee);
     }
 
+    /// @notice claim the rakeback from the market and send to the operator
+    /// @param _marketId The id of the market
+    /// @dev can only be called after the market has been closed for 1 day
+    function claimRakeback(uint256 _marketId) external {
+        MarketState storage marketState = marketStates[_marketId];
+        if (marketState.closedAt + 1 days > block.timestamp)
+            revert TooEarlyRakebackClaim(marketState.closedAt + 1 days);
+
+        uint256 rakeback = marketState.rakebackFee;
+        marketState.rakebackFee = 0;
+        if (!IERC20(_settings.token()).transfer(_settings.operator(), rakeback)) revert FailedTransfer(msg.sender);
+    }
+
     /// @notice calculate the payout for a bet and deducts fees for market makers and operators
     /// @param _yourBetAmount The amount of the bet
     /// @param _totalPoolAmount The total amount of the pool
-    /// @param _poolSizeForWinningSide The size of the pool for the winning side
+    /// @param _poolAmountForWinningSide The size of the pool for the winning side
     /// @return payout The payout amount
     function calculatePayout(
         uint256 _yourBetAmount,
         uint256 _totalPoolAmount,
-        uint256 _poolSizeForWinningSide
+        uint256 _poolAmountForWinningSide
     ) public pure returns (uint256) {
-        return (_yourBetAmount * _totalPoolAmount) / _poolSizeForWinningSide;
+        return (_yourBetAmount * _totalPoolAmount) / _poolAmountForWinningSide;
     }
 
     /// @notice hash a bet

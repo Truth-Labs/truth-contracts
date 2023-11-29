@@ -3,11 +3,16 @@ pragma solidity 0.8.20;
 
 import "./interfaces/ISettings.sol";
 
+/// @title Settings
+/// @notice Configurable settings contract for opinion markets
+/// @dev fee precision is tightly coupled with operator, referral, and rakeback fees
 contract Settings is ISettings {
     address public token;
     address public operator;
     uint256 public duration = 5 minutes;
-    uint256 public operatorFee = 10000; // 1%
+    uint256 public operatorFee = 25000; // 2.5%
+    uint256 public referralFee = 12500; // 1.25%
+    uint256 public rakebackFee = 12500; // 1.25%
     uint8 public tokenUnits = 18;
     uint8 public feePrecision = 6;
     uint8 public minimumVotes = 15;
@@ -50,6 +55,16 @@ contract Settings is ISettings {
     function setOperatorFee(uint256 _operatorFee) external onlyOperator {
         operatorFee = _operatorFee;
         emit OperatorFeeChanged(_operatorFee);
+    }
+
+    function setReferralFee(uint256 _referralFee) external onlyOperator {
+        referralFee = _referralFee;
+        emit ReferralFeeChanged(_referralFee);
+    }
+
+    function setRakebackFee(uint256 _rakebackFee) external onlyOperator {
+        rakebackFee = _rakebackFee;
+        emit RakebackFeeChanged(_rakebackFee);
     }
 
     function setMinimumVotes(uint8 _minimumVotes) external onlyOperator {

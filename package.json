@@ -9,7 +9,8 @@
     "prettier": "prettier --write --plugin=prettier-plugin-solidity 'contracts/**/*.sol'",
     "deploy:OMD": "forge script script/OpinionMarketDeployer.s.sol:OMDScript --rpc-url $MUMBAI_RPC_URL --broadcast --verify -vvvv --legacy",
     "test": "forge test -v",
-    "test:name": "forge test -vv --match-test"
+    "test:name": "forge test -vv --match-test",
+    "coverage": "forge coverage"
   },
   "devDependencies": {},
   "dependencies": {
