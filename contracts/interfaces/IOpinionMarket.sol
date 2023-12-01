@@ -5,67 +5,67 @@ import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "./ISettings.sol";
 
 interface IOpinionMarket {
-    enum VoteChoice {
-        Yes,
-        No
-    }
+	enum VoteChoice {
+		Yes,
+		No
+	}
 
-    struct MarketState {
-        uint256 commitments;
-        uint256 yesVotes;
-        uint256 noVotes;
-        uint256 yesVolume;
-        uint256 noVolume;
-        uint256 rakebackFee;
-        uint256 closedAt;
-        bool isClosed;
-    }
+	struct MarketState {
+		uint256 commitments;
+		uint256 yesVotes;
+		uint256 noVotes;
+		uint256 yesVolume;
+		uint256 noVolume;
+		uint256 rakebackFee;
+		uint256 closedAt;
+		bool isClosed;
+	}
 
-    struct Bet {
-        address user;
-        uint256 marketId;
-        uint256 amount;
-        bytes32 commitment;
-        VoteChoice opinion;
-    }
+	struct Bet {
+		address user;
+		uint256 marketId;
+		uint256 amount;
+		bytes32 commitment;
+		VoteChoice opinion;
+	}
 
-    error Unauthorized();
-    error NotActive(uint256 endDate);
-    error NotInactive(uint256 endDate);
-    error NotClosed(uint256 marketId);
-    error InvalidAmount(address bettor);
-    error AlreadyCommited(address bettor);
-    error InvalidReveal(address bettor);
-    error AlreadyClaimed(address bettor);
-    error FailedTransfer(address bettor);
-    error TooEarlyRakebackClaim(uint256 validClaimDate);
+	error Unauthorized();
+	error NotActive(uint256 endDate);
+	error NotInactive(uint256 endDate);
+	error NotClosed(uint256 marketId);
+	error InvalidAmount(address bettor);
+	error AlreadyCommited(address bettor);
+	error InvalidReveal(address bettor);
+	error AlreadyClaimed(address bettor);
+	error FailedTransfer(address bettor);
+	error TooEarlyRakebackClaim(uint256 validClaimDate);
 
-    event BetCommited(address indexed bettor, uint256 amount, uint256 marketId);
-    event BetRevealed(address indexed bettor, VoteChoice choice, uint256 marketId);
-    event BetClaimed(address indexed bettor, uint256 amount, uint256 marketId);
-    event FeesClaimed(address indexed operator, uint256 amount);
+	event BetCommited(address indexed bettor, uint256 amount, uint256 marketId);
+	event BetRevealed(address indexed bettor, VoteChoice choice, uint256 marketId);
+	event BetClaimed(address indexed bettor, uint256 amount, uint256 marketId);
+	event FeesClaimed(address indexed operator, uint256 amount);
 
-    function start() external;
+	function start() external;
 
-    function commitBet(bytes32 _commitment, uint256 _amount) external;
+	function commitBet(bytes32 _commitment, uint256 _amount) external;
 
-    function revealBet(address _bettor, VoteChoice _opinion, uint256 _amount, bytes32 _salt) external;
+	function revealBet(address _bettor, VoteChoice _opinion, uint256 _amount, bytes32 _salt) external;
 
-    function closeMarket() external;
+	function closeMarket() external;
 
-    function claimBet(uint256 _marketId) external;
+	function claimBet(uint256 _marketId) external;
 
-    function claimAllBets(uint256[] calldata _marketIds) external;
+	function claimAllBets(uint256[] calldata _marketIds) external;
 
-    function claimRakeback(uint256 _marketId) external;
+	function claimRakeback(uint256 _marketId) external;
 
-    function calculatePayout(
-        uint256 _betAmount,
-        uint256 _totalPoolAmount,
-        uint256 _winningPoolAmount
-    ) external view returns (uint256);
+	function calculatePayout(
+		uint256 _betAmount,
+		uint256 _totalPoolAmount,
+		uint256 _winningPoolAmount
+	) external view returns (uint256);
 
-    function hashBet(VoteChoice _opinion, uint256 _amount, bytes32 _salt) external pure returns (bytes32);
+	function hashBet(VoteChoice _opinion, uint256 _amount, bytes32 _salt) external pure returns (bytes32);
 
-    function getBetId(address _bettor, uint256 _marketId) external pure returns (uint256);
+	function getBetId(address _bettor, uint256 _marketId) external pure returns (uint256);
 }

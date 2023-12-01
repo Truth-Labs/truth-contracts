@@ -10,32 +10,32 @@ import "./PayMaster.sol";
 import "./Settings.sol";
 
 contract OpinionMarketDeployer is PayMaster {
-    ISettings public settings;
-    IReferralProgram public referralProgram;
-    address constant private CIVIC_GATEWAY = 0xF65b6396dF6B7e2D8a6270E3AB6c7BB08BAEF22E;
-    /// @dev The network ID of the Gatekeeper network, 10 is proof of uniqueness
-    uint256 constant private CIVIC_NETWORK = 10;
+	ISettings public settings;
+	IReferralProgram public referralProgram;
+	address private constant CIVIC_GATEWAY = 0xF65b6396dF6B7e2D8a6270E3AB6c7BB08BAEF22E;
+	/// @dev The network ID of the Gatekeeper network, 10 is proof of uniqueness
+	uint256 private constant CIVIC_NETWORK = 10;
 
-    event OpinionMarketDeployed(address indexed market);
+	event OpinionMarketDeployed(address indexed market);
 
-    constructor(address _token) {
-        settings = new Settings(_token, msg.sender);
-        referralProgram = new ReferralProgram(msg.sender);
+	constructor(address _token) {
+		settings = new Settings(_token, msg.sender);
+		referralProgram = new ReferralProgram(msg.sender);
 
-        addAuthorizedSpender(address(this));
-    }
+		addAuthorizedSpender(address(this));
+	}
 
-    function deployMarket() public returns (address) {
-        OpinionMarket market = new OpinionMarket(
-            settings,
-            IPayMaster(address(this)),
-            referralProgram,
-            CIVIC_GATEWAY,
-            CIVIC_NETWORK
-        );
-        addAuthorizedSpender(address(market));
+	function deployMarket() public returns (address) {
+		OpinionMarket market = new OpinionMarket(
+			settings,
+			IPayMaster(address(this)),
+			referralProgram,
+			CIVIC_GATEWAY,
+			CIVIC_NETWORK
+		);
+		addAuthorizedSpender(address(market));
 
-        emit OpinionMarketDeployed(address(market));
-        return address(market);
-    }
+		emit OpinionMarketDeployed(address(market));
+		return address(market);
+	}
 }

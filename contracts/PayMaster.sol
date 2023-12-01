@@ -9,36 +9,36 @@ import "./interfaces/IPayMaster.sol";
 /// @notice Collects fees for opinion markets
 /// @dev Allows a single approval for all markets
 contract PayMaster is IPayMaster {
-    address public owner;
-    mapping(address => bool) public _authorizedSpenders;
+	address public owner;
+	mapping(address => bool) public _authorizedSpenders;
 
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert NotAuthorized(msg.sender);
-        _;
-    }
+	modifier onlyOwner() {
+		if (msg.sender != owner) revert NotAuthorized(msg.sender);
+		_;
+	}
 
-    modifier onlyAuthorizedSpender() {
-        if (!_authorizedSpenders[msg.sender]) revert NotAuthorized(msg.sender);
-        _;
-    }
+	modifier onlyAuthorizedSpender() {
+		if (!_authorizedSpenders[msg.sender]) revert NotAuthorized(msg.sender);
+		_;
+	}
 
-    constructor() {
-        owner = msg.sender;
-    }
+	constructor() {
+		owner = msg.sender;
+	}
 
-    /// @notice collect tokens from a user
-    /// @param _token the token to collect
-    /// @param _from the user to collect from
-    /// @param _amount the amount to collect
-    function collect(address _token, address _from, uint256 _amount) public onlyAuthorizedSpender {
-        if (!IERC20(_token).transferFrom(_from, msg.sender, _amount)) {
-            revert FailedTransfer(_token, _from, msg.sender, _amount);
-        }
-    }
+	/// @notice collect tokens from a user
+	/// @param _token the token to collect
+	/// @param _from the user to collect from
+	/// @param _amount the amount to collect
+	function collect(address _token, address _from, uint256 _amount) public onlyAuthorizedSpender {
+		if (!IERC20(_token).transferFrom(_from, msg.sender, _amount)) {
+			revert FailedTransfer(_token, _from, msg.sender, _amount);
+		}
+	}
 
-    /// @notice add an authorized spender
-    /// @param spender the spender to add
-    function addAuthorizedSpender(address spender) internal onlyOwner {
-        _authorizedSpenders[spender] = true;
-    }
+	/// @notice add an authorized spender
+	/// @param spender the spender to add
+	function addAuthorizedSpender(address spender) internal onlyOwner {
+		_authorizedSpenders[spender] = true;
+	}
 }
