@@ -31,7 +31,7 @@ contract ReferralProgram is IReferralProgram {
             referredBy: operator,
             referrees: new address[](0),
             isRegistered: true,
-            isInfluencer: false,
+            isInfluencer: false
         });
 
         emit UserAdded(msg.sender);
@@ -46,7 +46,7 @@ contract ReferralProgram is IReferralProgram {
             referredBy: operator,
             referrees: new address[](0),
             isRegistered: true,
-            isInfluencer: true,
+            isInfluencer: true
         });
         affiliateCodes[_code] = _user;
 
@@ -67,7 +67,7 @@ contract ReferralProgram is IReferralProgram {
             referredBy: _referrer,
             referrees: new address[](0),
             isRegistered: true,
-            isInfluencer: false,
+            isInfluencer: false
         });
 
         emit ReferreeAdded(_referrer, msg.sender);
