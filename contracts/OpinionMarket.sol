@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "@identity.com/gateway-protocol-eth/contracts/interfaces/IGatewayTokenVerifier.sol";
 
 import "./interfaces/IOpinionMarket.sol";
 import "./interfaces/ISettings.sol";
@@ -15,6 +16,8 @@ contract OpinionMarket is IOpinionMarket {
     ISettings private _settings;
     IPayMaster private _payMaster;
     IReferralProgram private _referralProgram;
+    address private _gatewayTokenContract;
+    uint256 private _gatekeeperNetwork;
     uint256 public endDate;
     uint256 public marketId;
     mapping(uint256 => MarketState) public marketStates;
@@ -43,10 +46,18 @@ contract OpinionMarket is IOpinionMarket {
         _;
     }
 
-    constructor(ISettings _initialSettings, IPayMaster _initialPayMaster, IReferralProgram _initialReferralProgram) {
+    constructor(
+        ISettings _initialSettings,
+        IPayMaster _initialPayMaster,
+        IReferralProgram _initialReferralProgram,
+        address _initialGatewayTokenContract,
+        uint256 _initialGatekeeperNetwork
+    ) {
         _settings = _initialSettings;
         _payMaster = _initialPayMaster;
         _referralProgram = _initialReferralProgram;
+        _gatewayTokenContract = _initialGatewayTokenContract;
+        _gatekeeperNetwork = _initialGatekeeperNetwork;
     }
 
     /// @notice start a new market
@@ -91,12 +102,12 @@ contract OpinionMarket is IOpinionMarket {
         bets[id].opinion = _opinion;
         if (_opinion == VoteChoice.Yes) {
             marketStates[marketId].yesVolume += _amount;
-            if (_referralProgram.getReferralStatus(_bettor).isVerified) {
+            if (isVerified(_bettor)) {
                 marketStates[marketId].yesVotes += 1;
             }
         } else {
             marketStates[marketId].noVolume += _amount;
-            if (_referralProgram.getReferralStatus(_bettor).isVerified) {
+            if (isVerified(_bettor)) {
                 marketStates[marketId].noVotes += 1;
             }
         }
@@ -210,5 +221,10 @@ contract OpinionMarket is IOpinionMarket {
     /// @return id The id of the bet
     function getBetId(address _bettor, uint256 _marketId) public pure returns (uint256) {
         return uint256(keccak256(abi.encodePacked(_bettor, _marketId)));
+    }
+
+    function isVerified(address _user) private view returns (bool) {
+        IGatewayTokenVerifier verifier = IGatewayTokenVerifier(_gatewayTokenContract);
+        return verifier.verifyToken(_user, _gatekeeperNetwork);
     }
 }

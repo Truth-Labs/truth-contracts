@@ -6,7 +6,6 @@ interface IReferralProgram {
         address referredBy;
         bool isRegistered;
         bool isInfluencer;
-        bool isVerified;
         address[] referrees;
     }
 
@@ -28,8 +27,6 @@ interface IReferralProgram {
     function addReferreeWithCode(string calldata _code) external;
 
     function addReferreeWithoutCode(address _referrer) external;
-
-    function verifyUser(address _user) external;
 
     function getReferrer(address _user) external view returns (address);
 

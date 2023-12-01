@@ -32,7 +32,6 @@ contract ReferralProgram is IReferralProgram {
             referrees: new address[](0),
             isRegistered: true,
             isInfluencer: false,
-            isVerified: false
         });
 
         emit UserAdded(msg.sender);
@@ -48,7 +47,6 @@ contract ReferralProgram is IReferralProgram {
             referrees: new address[](0),
             isRegistered: true,
             isInfluencer: true,
-            isVerified: true
         });
         affiliateCodes[_code] = _user;
 
@@ -70,7 +68,6 @@ contract ReferralProgram is IReferralProgram {
             referrees: new address[](0),
             isRegistered: true,
             isInfluencer: false,
-            isVerified: false
         });
 
         emit ReferreeAdded(_referrer, msg.sender);
@@ -87,12 +84,6 @@ contract ReferralProgram is IReferralProgram {
     /// @param _referrer the referrer to add to the referree
     function addReferreeWithoutCode(address _referrer) external {
         addReferree(_referrer);
-    }
-
-    /// @notice verify a user
-    /// @param _user the user to verify
-    function verifyUser(address _user) external onlyOperator {
-        userReferralStatuses[_user].isVerified = true;
     }
 
     /// @notice get the referrer of a user

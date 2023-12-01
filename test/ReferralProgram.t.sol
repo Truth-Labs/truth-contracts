@@ -28,11 +28,10 @@ contract ReferralProgramTest is Test {
         vm.prank(_user);
         _referralProgram.addUser();
 
-        (address referredBy, bool isRegistered, bool isInfluencer, bool isVerified) = _referralProgram.userReferralStatuses(_user);
+        (address referredBy, bool isRegistered, bool isInfluencer) = _referralProgram.userReferralStatuses(_user);
         assertEq(referredBy, address(this));
         assertTrue(isRegistered);
         assertFalse(isInfluencer);
-        assertFalse(isVerified);
     }
 
     function testRevert_addUserAlreadyRegistered(address _user) public {
@@ -52,11 +51,10 @@ contract ReferralProgramTest is Test {
 
         _referralProgram.addInfluencer(_user, _code);
 
-        (address referredBy, bool isRegistered, bool isInfluencer, bool isVerified) = _referralProgram.userReferralStatuses(_user);
+        (address referredBy, bool isRegistered, bool isInfluencer) = _referralProgram.userReferralStatuses(_user);
         assertEq(referredBy, address(this));
         assertTrue(isRegistered);
         assertTrue(isInfluencer);
-        assertTrue(isVerified);
     }
 
     function testRevert_addInfluencerAlreadyRegistered(address _user, string calldata _code) public {
@@ -89,11 +87,10 @@ contract ReferralProgramTest is Test {
         vm.prank(_referree);
         _referralProgram.addReferreeWithCode(_code);
 
-        (address referredBy, bool isRegistered, bool isInfluencer, bool isVerified) = _referralProgram.userReferralStatuses(_referree);
+        (address referredBy, bool isRegistered, bool isInfluencer) = _referralProgram.userReferralStatuses(_referree);
         assertEq(referredBy, _referrer);
         assertTrue(isRegistered);
         assertFalse(isInfluencer);
-        assertFalse(isVerified);
     }
 
     function testRevert_addReferreeWithCodeAlreadyRegistered(address _referree, address _referrer, string calldata _code) public {
@@ -125,11 +122,10 @@ contract ReferralProgramTest is Test {
         vm.prank(_referree);
         _referralProgram.addReferreeWithoutCode(_referrer);
 
-        (address referredBy, bool isRegistered, bool isInfluencer, bool isVerified) = _referralProgram.userReferralStatuses(_referree);
+        (address referredBy, bool isRegistered, bool isInfluencer) = _referralProgram.userReferralStatuses(_referree);
         assertEq(referredBy, _referrer);
         assertTrue(isRegistered);
         assertFalse(isInfluencer);
-        assertFalse(isVerified);
     }
 
     function testRevert_addReferreeWithoutCodeMaxReferreesReached(address _referrer) public {
@@ -157,29 +153,6 @@ contract ReferralProgramTest is Test {
         vm.prank(user);
         vm.expectRevert(_maxReferreesReached);
         _referralProgram.addReferreeWithoutCode(_referrer);
-    }
-
-    function test_verifyUser(address _user) public {
-        vm.assume(_user != address(0));
-        vm.assume(_user != address(this));
-
-        vm.prank(_user);
-        _referralProgram.addUser();
-        _referralProgram.verifyUser(_user);
-
-        (,,, bool isVerified) = _referralProgram.userReferralStatuses(_user);
-        assertTrue(isVerified);
-    }
-
-    function testRevert_verifyUser_unauthorized(address _user) public {
-        vm.assume(_user != address(0));
-        vm.assume(_user != address(this));
-
-        vm.prank(_user);
-        _referralProgram.addUser();
-        vm.prank(_user);
-        vm.expectRevert(_unauthorized);
-        _referralProgram.verifyUser(_user);
     }
 
     function test_getReferrer(address _user, address _referrer) public {
@@ -251,6 +224,5 @@ contract ReferralProgramTest is Test {
         assertEq(status.referredBy, _referrer);
         assertTrue(status.isRegistered);
         assertFalse(status.isInfluencer);
-        assertFalse(status.isVerified);
     }
 }

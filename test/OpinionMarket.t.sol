@@ -593,10 +593,6 @@ contract OpinionMarketTest is Test {
             vm.prank(_bettor);
             referralProgram.addUser();
         }
-
-        if (!status.isVerified) {
-            referralProgram.verifyUser(_bettor);
-        }
     }
 
     function _calculateOperatorFee(uint256 noVotes, uint256 yesVotes, uint256 noVolume, uint256 yesVolume) internal view returns (uint256) {
