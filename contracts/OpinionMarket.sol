@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import "@identity.com/gateway-protocol-eth/contracts/interfaces/IGatewayTokenVerifier.sol";
+import "../lib/on-chain-identity-gateway/ethereum/smart-contract/contracts/interfaces/IGatewayTokenVerifier.sol";
 
 import "./interfaces/IOpinionMarket.sol";
 import "./interfaces/ISettings.sol";
