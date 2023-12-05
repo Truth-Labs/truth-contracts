@@ -223,8 +223,18 @@ contract OpinionMarket is IOpinionMarket {
 		return uint256(keccak256(abi.encodePacked(_bettor, _marketId)));
 	}
 
+	/// @notice check if a user is verified
+	/// @param _user The user to check
+	/// @return bool True if the user is verified
 	function isVerified(address _user) private view returns (bool) {
 		IGatewayTokenVerifier verifier = IGatewayTokenVerifier(_gatewayTokenContract);
 		return verifier.verifyToken(_user, _gatekeeperNetwork);
+	}
+
+	/// @notice checks if a market is ready for reveals
+	/// @param _marketId The id of the market
+	/// @return bool True if the market is ready for reveals
+	function isInactive(uint256 _marketId) external view returns (bool) {
+		return endDate > block.timestamp || marketStates[_marketId].commitments < _settings.minimumVotes();
 	}
 }
