@@ -235,6 +235,6 @@ contract OpinionMarket is IOpinionMarket {
 	/// @param _marketId The id of the market
 	/// @return bool True if the market is ready for reveals
 	function isInactive(uint256 _marketId) external view returns (bool) {
-		return endDate > block.timestamp || marketStates[_marketId].commitments < _settings.minimumVotes();
+		return endDate < block.timestamp && marketStates[_marketId].commitments > _settings.minimumVotes();
 	}
 }
