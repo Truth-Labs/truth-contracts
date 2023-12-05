@@ -13,6 +13,7 @@ contract PercentageMathTest is Test {
         vm.assume(_percentage > 0);
         vm.assume(_precision > 0);
         vm.assume(_precision <= 18);
+        vm.assume(_value < type(uint256).max / _percentage);
 
         uint256 result = _value.multiplyByPercentage(_percentage, _precision);
         assertEq(result, (_value * _percentage) / (10 ** _precision));

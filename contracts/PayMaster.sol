@@ -13,12 +13,12 @@ contract PayMaster is IPayMaster {
 	mapping(address => bool) public _authorizedSpenders;
 
 	modifier onlyOwner() {
-		if (msg.sender != owner) revert NotAuthorized(msg.sender);
+		if (msg.sender != owner) revert Unauthorized(msg.sender);
 		_;
 	}
 
 	modifier onlyAuthorizedSpender() {
-		if (!_authorizedSpenders[msg.sender]) revert NotAuthorized(msg.sender);
+		if (!_authorizedSpenders[msg.sender]) revert Unauthorized(msg.sender);
 		_;
 	}
 

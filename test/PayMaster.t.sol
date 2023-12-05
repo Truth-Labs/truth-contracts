@@ -9,7 +9,7 @@ import "../contracts/mocks/MockToken.sol";
 
 contract PayMasterTest is Test, PayMaster {
     PayMaster internal _payMaster;
-    bytes4 internal _notAuthorized = bytes4(keccak256("NotAuthorized(address)"));
+    bytes4 internal _unauthorized = bytes4(keccak256("Unauthorized(address)"));
     bytes4 internal _failedTransfer = bytes4(keccak256("FailedTransfer(address,address,address,uint256)"));
 
     function setUp() public {
@@ -45,7 +45,7 @@ contract PayMasterTest is Test, PayMaster {
         assertEq(token.balanceOf(_spender), _amount);
     }
 
-    function test_collect_notAuthorized(address _holder, address _spender, uint16 _amount) public {
+    function test_collect_unauthorized(address _holder, address _spender, uint16 _amount) public {
         vm.assume(_holder != address(0));
         vm.assume(_spender != address(0));
         vm.assume(_holder != _spender);
@@ -60,7 +60,7 @@ contract PayMasterTest is Test, PayMaster {
         token.approve(address(this), _amount);
         
         vm.prank(_spender);
-        vm.expectRevert(abi.encodeWithSelector(_notAuthorized, _spender));
+        vm.expectRevert(abi.encodeWithSelector(_unauthorized, _spender));
         _payMaster.collect(address(token), _holder, _amount);
     }
 }

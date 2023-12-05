@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+import "../lib/on-chain-identity-gateway/ethereum/smart-contract/contracts/interfaces/IGatewayTokenVerifier.sol";
+
 import "../contracts/OpinionMarket.sol";
 import "../contracts/OpinionMarketDeployer.sol";
 import "../contracts/interfaces/IOpinionMarket.sol";
 import "../contracts/interfaces/ISettings.sol";
 import "../contracts/interfaces/IReferralProgram.sol";
 import "../contracts/mocks/MockToken.sol";
+import "../contracts/mocks/MockGatewayTokenVerifier.sol";
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
@@ -16,6 +19,7 @@ contract OpinionMarketTest is Test {
 
     MockToken internal _token;
     OpinionMarketDeployer internal _deployer;
+    IGatewayTokenVerifier internal _gatewayTokenVerifier;
     OpinionMarket internal _market;
     /// @dev This mapping is used to store bets for testing purposes
     mapping(address => IOpinionMarket.Bet) bets;
@@ -34,6 +38,8 @@ contract OpinionMarketTest is Test {
     function setUp() public {
         _token = new MockToken();
         _deployer = new OpinionMarketDeployer(address(_token));
+        _gatewayTokenVerifier = new MockGatewayTokenVerifier(address(_deployer), 10);
+        _deployer.setCivicParameters(address(_gatewayTokenVerifier), 10);
         _market = OpinionMarket(_deployer.deployMarket());
 
         _token.approve(address(_deployer), type(uint256).max);
