@@ -11,3 +11,6 @@ out/
 node_modules/.yarn-integrity
 .env
 
+.DS_Store
+contracts/.DS_Store
+
