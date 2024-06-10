@@ -7,7 +7,7 @@ import "../lib/on-chain-identity-gateway/ethereum/smart-contract/contracts/inter
 import "./interfaces/IOpinionMarket.sol";
 import "./interfaces/ISettings.sol";
 import "./interfaces/IPayMaster.sol";
-import "./interfaces/IReferralProgram.sol";
+import "./interfaces/IGateway.sol";
 import "./libraries/PercentageMath.sol";
 
 contract OpinionMarket is IOpinionMarket {
@@ -15,9 +15,7 @@ contract OpinionMarket is IOpinionMarket {
 
 	ISettings private _settings;
 	IPayMaster private _payMaster;
-	IReferralProgram private _referralProgram;
-	address private _gatewayTokenContract;
-	uint256 private _gatekeeperNetwork;
+	address private _gateway;
 	uint256 public endDate;
 	uint256 public marketId;
 	mapping(uint256 => MarketState) public marketStates;
@@ -46,18 +44,10 @@ contract OpinionMarket is IOpinionMarket {
 		_;
 	}
 
-	constructor(
-		ISettings _initialSettings,
-		IPayMaster _initialPayMaster,
-		IReferralProgram _initialReferralProgram,
-		address _initialGatewayTokenContract,
-		uint256 _initialGatekeeperNetwork
-	) {
+	constructor(ISettings _initialSettings, IPayMaster _initialPayMaster, address _initialGateway) {
 		_settings = _initialSettings;
 		_payMaster = _initialPayMaster;
-		_referralProgram = _initialReferralProgram;
-		_gatewayTokenContract = _initialGatewayTokenContract;
-		_gatekeeperNetwork = _initialGatekeeperNetwork;
+		_gateway = _initialGateway;
 	}
 
 	/// @notice start a new market
@@ -227,8 +217,10 @@ contract OpinionMarket is IOpinionMarket {
 	/// @param _user The user to check
 	/// @return bool True if the user is verified
 	function isVerified(address _user) private view returns (bool) {
-		IGatewayTokenVerifier verifier = IGatewayTokenVerifier(_gatewayTokenContract);
-		return verifier.verifyToken(_user, _gatekeeperNetwork);
+		if (_gateway == address(0)) return true;
+
+		IGateway verifier = IGateway(_gateway);
+		return verifier.isVerified(_user);
 	}
 
 	/// @notice checks if a market is ready for reveals

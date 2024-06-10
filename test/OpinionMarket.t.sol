@@ -19,7 +19,6 @@ contract OpinionMarketTest is Test {
 
     MockToken internal _token;
     OpinionMarketDeployer internal _deployer;
-    IGatewayTokenVerifier internal _gatewayTokenVerifier;
     OpinionMarket internal _market;
     /// @dev This mapping is used to store bets for testing purposes
     mapping(address => IOpinionMarket.Bet) bets;
@@ -38,8 +37,6 @@ contract OpinionMarketTest is Test {
     function setUp() public {
         _token = new MockToken();
         _deployer = new OpinionMarketDeployer(address(_token));
-        _gatewayTokenVerifier = new MockGatewayTokenVerifier(address(_deployer), 10);
-        _deployer.setCivicParameters(address(_gatewayTokenVerifier), 10);
         _market = OpinionMarket(_deployer.deployMarket());
 
         _token.approve(address(_deployer), type(uint256).max);
