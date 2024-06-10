@@ -9,9 +9,8 @@ import "./interfaces/ISettings.sol";
 contract Settings is ISettings {
 	address public token;
 	address public operator;
-	uint256 public duration = 5 minutes;
+	uint256 public duration = 1 days;
 	uint256 public operatorFee = 25000; // 2.5%
-	uint256 public referralFee = 12500; // 1.25%
 	uint256 public rakebackFee = 12500; // 1.25%
 	uint8 public tokenUnits = 18;
 	uint8 public feePrecision = 6;
@@ -55,11 +54,6 @@ contract Settings is ISettings {
 	function setOperatorFee(uint256 _operatorFee) external onlyOperator {
 		operatorFee = _operatorFee;
 		emit OperatorFeeChanged(_operatorFee);
-	}
-
-	function setReferralFee(uint256 _referralFee) external onlyOperator {
-		referralFee = _referralFee;
-		emit ReferralFeeChanged(_referralFee);
 	}
 
 	function setRakebackFee(uint256 _rakebackFee) external onlyOperator {

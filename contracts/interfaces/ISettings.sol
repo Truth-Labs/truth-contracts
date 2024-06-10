@@ -9,7 +9,6 @@ interface ISettings {
 	event DurationChanged(uint256 newDuration);
 	event TokenUnitsChanged(uint8 newTokenUnits);
 	event OperatorFeeChanged(uint256 newOperatorFee);
-	event ReferralFeeChanged(uint256 newReferralFee);
 	event RakebackFeeChanged(uint256 newRakebackFee);
 	event FeePrecisionChanged(uint8 newFeePrecision);
 	event MinimumVotesChanged(uint8 newMinimumVotes);
@@ -28,8 +27,6 @@ interface ISettings {
 
 	function operatorFee() external view returns (uint256);
 
-	function referralFee() external view returns (uint256);
-
 	function rakebackFee() external view returns (uint256);
 
 	function setToken(address _token) external;
@@ -43,8 +40,6 @@ interface ISettings {
 	function setFeePrecision(uint8 _feePrecision) external;
 
 	function setOperatorFee(uint256 _operatorFee) external;
-
-	function setReferralFee(uint256 _referralFee) external;
 
 	function setRakebackFee(uint256 _rakebackFee) external;
 

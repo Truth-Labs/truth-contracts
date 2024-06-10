@@ -229,4 +229,17 @@ contract OpinionMarket is IOpinionMarket {
 	function isInactive(uint256 _marketId) external view returns (bool) {
 		return endDate < block.timestamp && marketStates[_marketId].commitments > _settings.minimumVotes();
 	}
+
+	/// @notice emergency withdraw all funds from the contract
+	/// @dev can only be called by the operator after the market has been inactive for 10 days
+	function emergencyWithdraw() external onlyOperator {
+		if (endDate > block.timestamp + 10 days) {
+			revert NotInactive(endDate);
+		}
+
+		IERC20 token = IERC20(_settings.token());
+		if (!token.transfer(_settings.operator(), token.balanceOf(address(this)))) {
+			revert FailedTransfer(msg.sender);
+		}
+	}
 }

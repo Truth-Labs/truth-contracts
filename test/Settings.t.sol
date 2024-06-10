@@ -34,10 +34,6 @@ contract SettingsTest is Test {
         assertEq(_settings.operatorFee(), 25000);
     }
 
-    function test_referralFee() public {
-        assertEq(_settings.referralFee(), 12500);
-    }
-
     function test_rakebackFee() public {
         assertEq(_settings.rakebackFee(), 12500);
     }
@@ -73,11 +69,6 @@ contract SettingsTest is Test {
     function test_setOperatorFee() public {
         _settings.setOperatorFee(10001);
         assertEq(_settings.operatorFee(), 10001);
-    }
-
-    function test_setReferralFee() public {
-        _settings.setReferralFee(10001);
-        assertEq(_settings.referralFee(), 10001);
     }
 
     function test_setRakebackFee() public {
@@ -133,14 +124,6 @@ contract SettingsTest is Test {
         vm.prank(_user);
         vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
         _settings.setOperatorFee(10001);
-    }
-
-    function testRevert_setReferralFeeNotOperator(address _user) public {
-        vm.assume(!(_user == address(this)));
-
-        vm.prank(_user);
-        vm.expectRevert(abi.encodeWithSelector(_unauthorizedSelector));
-        _settings.setReferralFee(10001);
     }
 
     function testRevert_setRakebackFeeNotOperator(address _user) public {
